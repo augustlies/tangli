@@ -17,6 +17,7 @@ import android.view.View;
 import android.view.ViewConfiguration;
 import android.animation.ValueAnimator;
 import android.view.animation.PathInterpolator;
+import android.widget.OverScroller;
 
 import androidx.annotation.Nullable;
 
@@ -91,7 +92,11 @@ public class TimetableView extends View {
 
     private static final String[] DAY_NAMES = {"一", "二", "三", "四", "五", "六", "日"};
     private static final int TOTAL_SECTIONS = 10;
-    private static final int VISIBLE_SECTIONS = 8;
+    private static final int DEFAULT_VISIBLE_SECTIONS = 8;
+    /** 一屏显示几节：默认 8 节（可上下滚），打开「一屏显示 10 节」后压缩课块高度一屏放下。 */
+    private int visibleSections = DEFAULT_VISIBLE_SECTIONS;
+    /** 纵向惯性滚动 + 到头回弹。 */
+    private OverScroller scroller;
 
     private Timetable timetable = new Timetable();
     private ScheduleSettings schedule = ScheduleSettings.createDefault();
@@ -168,6 +173,7 @@ public class TimetableView extends View {
         timeColWidth = dp(48);
         rowHeight = dp(54);
         touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
+        scroller = new OverScroller(context, new android.view.animation.DecelerateInterpolator(1.6f));
 
         gridPaint.setColor(HAIRLINE);
         gridPaint.setStrokeWidth(Math.max(1f, dp(0.6f)));
@@ -254,6 +260,51 @@ public class TimetableView extends View {
     }
 
     /** Dock 覆盖区域高度：课表背景仍延伸其下，但可视 8 节与滚动范围避开遮挡。 */
+    /** true = 一屏放下全部 10 节（课块变矮），false = 默认 8 节可滚动。 */
+    public void setFitAllSections(boolean fit) {
+        int v = fit ? TOTAL_SECTIONS : DEFAULT_VISIBLE_SECTIONS;
+        if (v == visibleSections) return;
+        visibleSections = v;
+        if (scroller != null) scroller.forceFinished(true);
+        if (getHeight() > 0) updateRowHeight(getHeight());
+        invalidate();
+    }
+
+    /** 拖过头时的阻力：越往外越拉不动，最多拉出约 1/4 屏。 */
+    private float rubberBand(float delta) {
+        float over = scrollOffset < 0 ? -scrollOffset : scrollOffset > maxScrollOffset ? scrollOffset - maxScrollOffset : 0f;
+        boolean outward = (scrollOffset < 0 && delta < 0) || (scrollOffset > maxScrollOffset && delta > 0);
+        if (!outward && over == 0f) {
+            // 正常区间内，跨过边界的那一段才加阻力
+            float next = scrollOffset + delta;
+            if (next < 0) return -scrollOffset + next * 0.45f;
+            if (next > maxScrollOffset) return (maxScrollOffset - scrollOffset) + (next - maxScrollOffset) * 0.45f;
+            return delta;
+        }
+        if (!outward) return delta;
+        float limit = Math.max(dp(80), getHeight() * 0.25f);
+        float k = 0.45f * Math.max(0.05f, 1f - over / limit);
+        return delta * k;
+    }
+
+    private void springBackIfNeeded() {
+        if (scrollOffset < 0 || scrollOffset > maxScrollOffset) {
+            scroller.springBack(0, Math.round(scrollOffset), 0, 0, 0, Math.round(maxScrollOffset));
+            postInvalidateOnAnimation();
+        } else if (verticalScrollListener != null) {
+            verticalScrollListener.onVerticalScrollEnd();
+        }
+    }
+
+    @Override
+    public void computeScroll() {
+        if (scroller != null && scroller.computeScrollOffset()) {
+            scrollOffset = scroller.getCurrY();
+            postInvalidateOnAnimation();
+            if (scroller.isFinished() && verticalScrollListener != null) verticalScrollListener.onVerticalScrollEnd();
+        }
+    }
+
     public void setBottomInset(float px) {
         this.bottomInset = Math.max(0, px);
         if (getHeight() > 0) updateRowHeight(getHeight());
@@ -275,8 +326,8 @@ public class TimetableView extends View {
 
     private void updateRowHeight(int h) {
         float available = Math.max(dp(240), h - headerHeight - bottomInset);
-        rowHeight = available / VISIBLE_SECTIONS;
-        maxScrollOffset = Math.max(0, rowHeight * (TOTAL_SECTIONS - VISIBLE_SECTIONS));
+        rowHeight = available / visibleSections;
+        maxScrollOffset = Math.max(0, rowHeight * (TOTAL_SECTIONS - visibleSections));
         scrollOffset = Math.max(0, Math.min(maxScrollOffset, scrollOffset));
     }
 
@@ -809,6 +860,12 @@ public class TimetableView extends View {
         }
 
         canvas.restore();
+
+        // 有备注（作业、提醒）：右下角一个朱砂小点（右上角留给冲突角标）
+        if (isActive && course.note != null && !course.note.isEmpty()) {
+            badgePaint.setColor(ACCENT);
+            canvas.drawCircle(rect.right - dp(6f), rect.bottom - dp(6f), dp(2.6f), badgePaint);
+        }
     }
 
     private void drawScrollHint(Canvas canvas, int w, int h) {
@@ -816,8 +873,8 @@ public class TimetableView extends View {
         float trackTop = headerHeight + dp(4);
         float trackBottom = h - dp(4);
         float trackHeight = trackBottom - trackTop;
-        float thumbHeight = Math.max(dp(24), trackHeight * VISIBLE_SECTIONS / TOTAL_SECTIONS);
-        float progress = maxScrollOffset <= 0 ? 0 : scrollOffset / maxScrollOffset;
+        float thumbHeight = Math.max(dp(24), trackHeight * visibleSections / TOTAL_SECTIONS);
+        float progress = maxScrollOffset <= 0 ? 0 : Math.max(0f, Math.min(1f, scrollOffset / maxScrollOffset));
         float thumbTop = trackTop + (trackHeight - thumbHeight) * progress;
 
         blockPaint.setStyle(Paint.Style.FILL);
@@ -914,6 +971,8 @@ public class TimetableView extends View {
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 if (pageAnimating) flushPendingCommit();
+                // 惯性/回弹中按下：停在当前位置接着拖
+                if (!scroller.isFinished()) scroller.forceFinished(true);
                 activePointerId = event.getPointerId(0);
                 downX = event.getX();
                 downY = event.getY();
@@ -948,7 +1007,7 @@ public class TimetableView extends View {
                     invalidate();
                 } else if (gestureMode == 2) {
                     float y = event.getY(pointerIndex);
-                    scrollOffset = Math.max(0, Math.min(maxScrollOffset, scrollOffset - (y - lastY)));
+                    scrollOffset += rubberBand(-(y - lastY));
                     lastY = y;
                     invalidate();
                 }
@@ -957,8 +1016,17 @@ public class TimetableView extends View {
 
             case MotionEvent.ACTION_UP: {
                 removeCallbacks(longPressRunnable);
-                if (gestureMode == 2 && verticalScrollListener != null) {
-                    verticalScrollListener.onVerticalScrollEnd();
+                if (gestureMode == 2) {
+                    velocityTracker.computeCurrentVelocity(1000, dp(8000));
+                    float vy = velocityTracker.getYVelocity(activePointerId);
+                    if (scrollOffset >= 0 && scrollOffset <= maxScrollOffset && Math.abs(vy) > dp(250)) {
+                        // 惯性滚到头会冲出一小段再弹回
+                        scroller.fling(0, Math.round(scrollOffset), 0, Math.round(-vy), 0, 0,
+                                0, Math.round(maxScrollOffset), 0, Math.round(dp(36)));
+                        postInvalidateOnAnimation();
+                    } else {
+                        springBackIfNeeded();
+                    }
                 }
                 if (gestureMode == 1) {
                     velocityTracker.computeCurrentVelocity(1000, dp(6000));
@@ -974,9 +1042,7 @@ public class TimetableView extends View {
 
             case MotionEvent.ACTION_CANCEL:
                 removeCallbacks(longPressRunnable);
-                if (gestureMode == 2 && verticalScrollListener != null) {
-                    verticalScrollListener.onVerticalScrollEnd();
-                }
+                if (gestureMode == 2) springBackIfNeeded();
                 if (gestureMode == 1) settlePage(dragDx < 0 ? 1 : (dragDx > 0 ? -1 : 0), 0f);
                 finishGesture();
                 gestureMode = 0;

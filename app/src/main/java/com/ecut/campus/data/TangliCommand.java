@@ -4,8 +4,11 @@ import org.json.JSONException;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -22,6 +25,10 @@ import java.util.regex.Pattern;
  * 假 2027-01-01 至 2027-01-03 | 元旦
  * 补 2027-01-04 | 2027-01-01
  * 开学 2026-09-07
+ * 备注 地质学 | 交第三章作业
+ * 设置 主题=深色 | 显示周末=否
+ * 作息 第1节 08:00-08:45 | 第2节 08:55-09:40
+ * 同步 课表      导出 诊断日志      打开 校园邮箱
  * </pre>
  *
  * 字段顺序随意，按内容识别；全角符号、代码块、项目符号都能容忍。
@@ -40,6 +47,8 @@ public final class TangliCommand {
         public int[] sectionStart = new int[0]; // 下标 = 节次，分钟数
         public int[] sectionEnd = new int[0];
         public String today = "";          // 解析「本周」「下周」用
+        /** 当前各项设置的规范值（{@link AppSetting}），用来判断「设置」是不是真有改动。 */
+        public Map<String, String> settings = new HashMap<>();
     }
 
     public static final class Item {
@@ -48,12 +57,41 @@ public final class TangliCommand {
         public boolean changed;     // 有实际改动（重复的不算）
         public boolean warn;        // 需要醒目提醒（删教务课、整表清空）
         public String desc = "";    // 人话描述 / 错误原因
+        /** 非课表的动作：set / section / sync / export / open；空 = 改课表。 */
+        public String action = "";
+        public String key = "";
+        public String value = "";
+        /** set 时可能一行改多项：key → 规范值。 */
+        public final Map<String, String> settings = new LinkedHashMap<>();
     }
 
     public static final class Plan {
         public final List<Item> items = new ArrayList<>();
         public boolean replaceAll;
         public Timetable result;
+        /** 作息改动后的每节起止（分钟，下标 = 节次）；sectionsChanged=false 时不用管。 */
+        public int[] sectionStart = new int[0];
+        public int[] sectionEnd = new int[0];
+        public boolean sectionsChanged;
+
+        /** 课表本身有没有改动（不算设置、作息和动作）。 */
+        public boolean timetableChanged() {
+            for (Item i : items) if (i.ok && i.changed && i.action.isEmpty()) return true;
+            return false;
+        }
+
+        public List<Item> actions(String type) {
+            List<Item> out = new ArrayList<>();
+            for (Item i : items) if (i.ok && i.changed && i.action.equals(type)) out.add(i);
+            return out;
+        }
+
+        /** 应用后要合并写入的设置。 */
+        public Map<String, String> settings() {
+            Map<String, String> m = new LinkedHashMap<>();
+            for (Item i : actions("set")) m.putAll(i.settings);
+            return m;
+        }
 
         public int changeCount() {
             int n = 0;
@@ -85,6 +123,9 @@ public final class TangliCommand {
         }
         if (env == null) env = new Env();
         if (text == null) text = "";
+        plan.sectionStart = env.sectionStart.clone();
+        plan.sectionEnd = env.sectionEnd.clone();
+        Map<String, String> settingsNow = new HashMap<>(env.settings);
 
         boolean seenHeader = false;
         for (String raw : text.split("\\r?\\n")) {
@@ -111,7 +152,7 @@ public final class TangliCommand {
             Item it = new Item();
             it.line = raw.trim();
             try {
-                apply(op, t, env, it);
+                apply(op, t, env, it, plan, settingsNow);
                 it.ok = true;
             } catch (CmdError e) {
                 it.ok = false;
@@ -135,7 +176,7 @@ public final class TangliCommand {
         CmdError(String m) { super(m); }
     }
 
-    private enum Kind { ADD, REMOVE, CANCEL, MOVE, OFF, MAKEUP, START }
+    private enum Kind { ADD, REMOVE, CANCEL, MOVE, OFF, MAKEUP, START, NOTE, SET, SECTION, SYNC, EXPORT, OPEN }
 
     private static final class Op {
         Kind kind;
@@ -147,7 +188,12 @@ public final class TangliCommand {
             {"开学", "START"}, {"添加", "ADD"}, {"新增", "ADD"}, {"增加", "ADD"}, {"加", "ADD"},
             {"删除", "REMOVE"}, {"删", "REMOVE"}, {"停课", "CANCEL"}, {"停", "CANCEL"},
             {"调课", "MOVE"}, {"调", "MOVE"}, {"放假", "OFF"}, {"假", "OFF"},
-            {"补课", "MAKEUP"}, {"补", "MAKEUP"},
+            {"补课", "MAKEUP"}, {"补", "MAKEUP"}, {"备注", "NOTE"}, {"作息", "SECTION"},
+    };
+
+    /** 这些动词后面可以直接跟内容（「同步课表」「打开邮箱」），不要求空格。 */
+    private static final String[][] LOOSE_VERBS = {
+            {"设置", "SET"}, {"同步", "SYNC"}, {"导出", "EXPORT"}, {"打开", "OPEN"}, {"进入", "OPEN"},
     };
 
     private static Op detect(String line) {
@@ -155,6 +201,16 @@ public final class TangliCommand {
         String s = line.replaceFirst("^(?:[*•·]\\s+|\\d+[.、)]\\s*)", "");
         if (s.startsWith("+")) return new Op(Kind.ADD, s.substring(1));
         if (s.startsWith("-") && !s.startsWith("->")) return new Op(Kind.REMOVE, s.substring(1));
+        for (String[] v : LOOSE_VERBS) {
+            if (s.startsWith(v[0]) && s.length() > v[0].length()) {
+                String rest = s.substring(v[0].length()).trim();
+                if (rest.startsWith(":") || rest.startsWith("|")) rest = rest.substring(1);
+                // 同步/导出/打开 的对象都很短；长句多半是 AI 的解释文字，不当指令
+                if (!rest.trim().isEmpty() && (v[1].equals("SET") || rest.trim().length() <= 10)) {
+                    return new Op(Kind.valueOf(v[1]), rest);
+                }
+            }
+        }
         for (String[] v : VERBS) {
             if (s.startsWith(v[0])) {
                 String rest = s.substring(v[0].length());
@@ -370,8 +426,15 @@ public final class TangliCommand {
 
     // ------------------------------------------------------------------ 执行
 
-    private static void apply(Op op, Timetable t, Env env, Item it) throws CmdError {
+    private static void apply(Op op, Timetable t, Env env, Item it, Plan plan,
+                              Map<String, String> settingsNow) throws CmdError {
         switch (op.kind) {
+            case NOTE: note(t, op.body, it); break;
+            case SET: set(op.body, it, settingsNow); break;
+            case SECTION: section(op.body, it, plan); break;
+            case SYNC: simple(op.body, it, "sync", SYNC_TARGETS, "同步"); break;
+            case EXPORT: simple(op.body, it, "export", EXPORT_TARGETS, "导出"); break;
+            case OPEN: simple(op.body, it, "open", OPEN_TARGETS, "打开"); break;
             case ADD: add(t, env, parseFields(op.body, env), it); break;
             case REMOVE: remove(t, env, parseFields(op.body, env), it); break;
             case CANCEL: cancel(t, env, parseFields(op.body, env), it); break;
@@ -641,6 +704,184 @@ public final class TangliCommand {
         t.semester.startDateTouched = true;
         env.start = monday;
         it.desc = "第 1 周从 " + monday + "（周一）开始";
+    }
+
+    // ------------------------------------------------------------------ 备注 / 设置 / 作息 / 动作
+
+    private static void note(Timetable t, String body, Item it) throws CmdError {
+        String b = body.trim();
+        int bar = b.indexOf('|');
+        String name = (bar < 0 ? b : b.substring(0, bar)).trim();
+        String text = bar < 0 ? "" : b.substring(bar + 1).trim();
+        if (name.isEmpty()) throw new CmdError("缺课程名");
+        boolean clear = text.isEmpty() || text.equals("清空") || text.equals("删除") || text.equals("无");
+        if (clear) text = "";
+        int hit = 0;
+        boolean changed = false;
+        for (Timetable.Course c : t.courses) {
+            if (!c.name.equals(name)) continue;
+            hit++;
+            if (!text.equals(c.note)) {
+                c.note = text;
+                changed = true;
+            }
+        }
+        if (hit == 0) throw new CmdError("课表里没有「" + name + "」");
+        it.changed = changed;
+        it.desc = (changed ? "" : "没变化，跳过：") + (clear ? "清空 " + name + " 的备注" : name + " 备注：" + text);
+    }
+
+    private static void set(String body, Item it, Map<String, String> now) throws CmdError {
+        List<String> pairs = new ArrayList<>();
+        for (String p : body.split("[|,;；]")) if (!p.trim().isEmpty()) pairs.add(p.trim());
+        if (pairs.isEmpty()) throw new CmdError("缺设置项");
+        StringBuilder desc = new StringBuilder();
+        boolean changed = false;
+        for (String p : pairs) {
+            String name, value;
+            Matcher m = Pattern.compile("^(.+?)\\s*[=:]\\s*(.*)$").matcher(p);
+            if (m.find()) {
+                name = m.group(1).trim();
+                value = m.group(2).trim();
+            } else {
+                int sp = p.lastIndexOf(' ');
+                if (sp < 0) throw new CmdError("「" + p + "」要写成 名字=值");
+                name = p.substring(0, sp).trim();
+                value = p.substring(sp + 1).trim();
+            }
+            String[] kv;
+            try {
+                kv = AppSetting.resolve(name, value);
+            } catch (IllegalArgumentException e) {
+                throw new CmdError(e.getMessage());
+            }
+            it.settings.put(kv[0], kv[1]);
+            boolean diff = !kv[1].equals(now.get(kv[0]));
+            if (diff) changed = true;
+            now.put(kv[0], kv[1]);
+            if (desc.length() > 0) desc.append("，");
+            desc.append(AppSetting.label(kv[0])).append(" → ").append(AppSetting.display(kv[0], kv[1]));
+            if (!diff) desc.append("（已是）");
+        }
+        it.action = "set";
+        it.changed = changed;
+        it.desc = (changed ? "设置 " : "没变化，跳过：设置 ") + desc;
+    }
+
+    private static final Pattern P_SECTION_RANGE = Pattern.compile(
+            "第?\\s*(\\d{1,2})\\s*节?\\s*:?\\s*(\\d{1,2}):(\\d{2})\\s*-\\s*(\\d{1,2}):(\\d{2})");
+
+    private static void section(String body, Item it, Plan plan) throws CmdError {
+        Matcher m = P_SECTION_RANGE.matcher(body);
+        int n = plan.sectionStart.length - 1;
+        if (n < 1) throw new CmdError("读不到当前作息");
+        StringBuilder desc = new StringBuilder();
+        boolean any = false, changed = false;
+        while (m.find()) {
+            any = true;
+            int sec = Integer.parseInt(m.group(1));
+            int st = Integer.parseInt(m.group(2)) * 60 + Integer.parseInt(m.group(3));
+            int en = Integer.parseInt(m.group(4)) * 60 + Integer.parseInt(m.group(5));
+            if (sec < 1 || sec > n) throw new CmdError("只有第 1 到第 " + n + " 节");
+            if (en <= st || st >= 24 * 60 || en > 24 * 60) throw new CmdError("第" + sec + "节时间不对");
+            if (sec > 1 && st < plan.sectionEnd[sec - 1]) {
+                throw new CmdError("第" + sec + "节开始早于第" + (sec - 1) + "节下课（"
+                        + hm(plan.sectionEnd[sec - 1]) + "）");
+            }
+            if (plan.sectionStart[sec] != st || plan.sectionEnd[sec] != en) changed = true;
+            // 后面的节次保持原来的时长和课间，整体顺延
+            int shift = st - plan.sectionStart[sec];
+            int[] dur = new int[n + 1], brk = new int[n + 1];
+            for (int i = 1; i <= n; i++) {
+                dur[i] = plan.sectionEnd[i] - plan.sectionStart[i];
+                brk[i] = i < n ? plan.sectionStart[i + 1] - plan.sectionEnd[i] : 0;
+            }
+            plan.sectionStart[sec] = st;
+            plan.sectionEnd[sec] = en;
+            for (int i = sec + 1; i <= n; i++) {
+                plan.sectionStart[i] = plan.sectionEnd[i - 1] + brk[i - 1];
+                plan.sectionEnd[i] = plan.sectionStart[i] + dur[i];
+            }
+            if (shift == 0 && dur[sec] == en - st) continue;
+            if (desc.length() > 0) desc.append("，");
+            desc.append("第").append(sec).append("节 ").append(hm(st)).append('-').append(hm(en));
+        }
+        if (!any) throw new CmdError("作息要写成 第1节 08:00-08:45");
+        it.action = "section";
+        it.changed = changed;
+        if (changed) plan.sectionsChanged = true;
+        it.desc = changed ? "作息 " + desc + "（后面的节次按原来的课间顺延）" : "作息没变化，跳过";
+    }
+
+    private static String hm(int minutes) {
+        return String.format(Locale.ROOT, "%02d:%02d", minutes / 60, minutes % 60);
+    }
+
+    /** 名字 → 规范值。第一个名字是预览里显示的。 */
+    private static final String[][] SYNC_TARGETS = {
+            {"timetable", "课表", "课程表", "课程"}, {"grades", "成绩", "分数"}, {"history", "历史学期", "历史课表", "以前的学期"},
+    };
+    private static final String[][] EXPORT_TARGETS = {
+            {"diag", "诊断日志", "日志", "诊断"}, {"ics", "日历", "ICS", "ics"}, {"share", "课表", "课表指令", "分享"},
+            {"all", "全部", "全部设置", "备份", "所有"},
+    };
+    private static final String[][] OPEN_TARGETS = {
+            {"mail", "校园邮箱", "邮箱"}, {"library", "图书馆", "预约图书馆"}, {"grades", "成绩"},
+            {"calendar", "校历"}, {"map", "校园地图", "地图"}, {"classmates", "同学", "共同空闲"},
+            {"share", "二维码", "分享二维码", "课表二维码"}, {"about", "关于", "检查更新"},
+            {"schedule", "作息时间", "作息"}, {"ttsettings", "课表设置"}, {"debug", "调试台", "调试"},
+            {"settings", "设置"}, {"adblock", "去广告", "广告拦截", "拦截"},
+    };
+
+    private static void simple(String body, Item it, String action, String[][] targets, String verb) throws CmdError {
+        String b = body.trim().replaceAll("^(一下|一次)\\s*", "");
+        for (String[] t : targets) {
+            for (int i = 1; i < t.length; i++) {
+                if (b.equals(t[i]) || b.equals(t[i] + "页") || b.equals(t[i] + "页面")) {
+                    it.action = action;
+                    it.value = t[0];
+                    it.changed = true;
+                    it.desc = verb + " " + t[1];
+                    return;
+                }
+            }
+        }
+        StringBuilder ok = new StringBuilder();
+        for (String[] t : targets) {
+            if (ok.length() > 0) ok.append("、");
+            ok.append(t[1]);
+        }
+        throw new CmdError("不能" + verb + "「" + b + "」，可以：" + ok);
+    }
+
+    /** 调试台「导出全部」：课表 + 临时安排 + 备注 + 设置 + 作息，粘回来就能还原。 */
+    public static String exportAll(Timetable t, Env env) {
+        StringBuilder sb = new StringBuilder(export(t, true, true));
+        if (t != null) {
+            for (Timetable.Course c : t.courses) {
+                if (c.note != null && !c.note.isEmpty()) sb.append("备注 ").append(c.name).append(" | ").append(c.note.replace('\n', ' ')).append('\n');
+            }
+        }
+        if (env != null) {
+            StringBuilder set = new StringBuilder();
+            for (String k : AppSetting.ORDER) {
+                String v = env.settings.get(k);
+                if (v == null || (AppSetting.SHARE_NAME.equals(k) && v.isEmpty())) continue;
+                if (set.length() > 0) set.append(" | ");
+                set.append(AppSetting.label(k)).append('=').append(AppSetting.display(k, v));
+            }
+            if (set.length() > 0) sb.append("设置 ").append(set).append('\n');
+            int n = env.sectionStart.length - 1;
+            if (n >= 1) {
+                sb.append("作息");
+                for (int i = 1; i <= n; i++) {
+                    sb.append(i == 1 ? " " : " | ").append("第").append(i).append("节 ")
+                            .append(hm(env.sectionStart[i])).append('-').append(hm(env.sectionEnd[i]));
+                }
+                sb.append('\n');
+            }
+        }
+        return sb.toString();
     }
 
     private static boolean hasAny(Timetable t, String name) {
