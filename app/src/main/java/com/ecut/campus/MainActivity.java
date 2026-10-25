@@ -753,16 +753,16 @@ public class MainActivity extends AppCompatActivity {
     private static String lastShownDay = "";
 
     private int actualCurrentWeek() {
-        String start = Prefs.semesterStartDate(this);
-        start = WeekMath.normalizeToMonday(start);
-        if (start == null || start.isEmpty()) {
-            // 没设开学日期时用官方校历兜底
-            com.ecut.campus.data.AcademicCalendar.Term t =
-                    com.ecut.campus.data.AcademicCalendar.termFor(WeekMath.todayDateLabel());
-            start = t != null ? t.classStart : "";
-        }
-        if (start == null || start.isEmpty()) return 1;
+        // 没设开学日期时用官方校历兜底（标题、日期、当前周必须用同一个起点）
+        String start = effectiveStart();
+        if (start.isEmpty()) return 1;
         return WeekMath.currentWeek(start, Prefs.totalWeeks(this));
+    }
+
+    private String effectiveStart() {
+        String id = currentTimetable != null && currentTimetable.semester != null
+                ? currentTimetable.semester.id : "";
+        return WeekMath.effectiveStart(Prefs.semesterStartDate(this), id);
     }
 
     /** 刻度标题：小字「第」+ 巨大等宽周数 + 「周」。不显示总周数。 */
@@ -802,7 +802,8 @@ public class MainActivity extends AppCompatActivity {
         scheduleSettings = ScheduleSettingsStore.load(this);
         int week = currentViewedWeek();
         int total = Prefs.totalWeeks(this);
-        String start = WeekMath.normalizeToMonday(Prefs.semesterStartDate(this));
+        String start = effectiveStart();
+        boolean startFromCalendar = Prefs.semesterStartDate(this).isEmpty() && !start.isEmpty();
         if (week > total) {
             week = total;
             Prefs.setCurrentWeek(this, week);
@@ -822,6 +823,7 @@ public class MainActivity extends AppCompatActivity {
                     : (until > 0 ? "距开学 " + until + " 天 · "
                             : (week != actualCurrentWeek() ? "本周是第 " + actualCurrentWeek() + " 周 · " : ""))
                             + WeekMath.weekRangeLabel(start, week)
+                            + (startFromCalendar ? "  ·  按校历" : "")
                             + staleHint());
         }
 

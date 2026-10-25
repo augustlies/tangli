@@ -473,23 +473,17 @@ public class TimetableView extends View {
     private void drawCourseBlocks(Canvas canvas, float colWidth, boolean activePass) {
         if (timetable == null || timetable.courses == null) return;
 
-        // 本周课程按「星期 + 双节槽」分组；同组多门即为冲突，按列并排，全部可点。
-        java.util.Map<Long, List<Timetable.Session>> activeGroups = new java.util.HashMap<>();
-        boolean[][] occupiedByActive = new boolean[8][TOTAL_SECTIONS + 1];
+        // 本周课程按真实起止位置（节次或自定义时间）算重叠；重叠的一簇按列并排，全部可点。
+        java.util.Map<Timetable.Session, int[]> laneOf = new java.util.HashMap<>();
+        List<List<Timetable.Session>> perDay = new ArrayList<>();
+        for (int d = 0; d <= 7; d++) perDay.add(new ArrayList<>());
         for (Timetable.Course c : timetable.courses) {
             for (Timetable.Session s : c.sessions) {
                 if (s.dayOfWeek < 1 || s.dayOfWeek > columnCount()) continue;
-                if (s.isActive(currentWeek)) {
-                    int start = pairStart(s.startSection);
-                    int end = Math.min(TOTAL_SECTIONS, start + 1);
-                    for (int sec = start; sec <= end; sec++) occupiedByActive[s.dayOfWeek][sec] = true;
-                    long key = s.dayOfWeek * 100L + start;
-                    List<Timetable.Session> g = activeGroups.get(key);
-                    if (g == null) { g = new ArrayList<>(); activeGroups.put(key, g); }
-                    g.add(s);
-                }
+                if (s.isActive(currentWeek)) perDay.get(s.dayOfWeek).add(s);
             }
         }
+        for (int d = 1; d <= 7; d++) assignLanes(perDay.get(d), laneOf);
 
         float padH = dp(1.6f);
         float padV = dp(1.6f);
@@ -505,16 +499,13 @@ public class TimetableView extends View {
                 boolean isActive = s.isActive(currentWeek);
                 if (isActive != activePass) continue;
 
-                int startSec = pairStart(s.startSection);
-                int endSec = Math.min(TOTAL_SECTIONS, startSec + 1);
+                float[] pos = position(s);
 
                 if (!isActive) {
                     boolean overlapped = false;
-                    for (int sec = startSec; sec <= endSec; sec++) {
-                        if (occupiedByActive[s.dayOfWeek][sec]) {
-                            overlapped = true;
-                            break;
-                        }
+                    for (Timetable.Session a : perDay.get(s.dayOfWeek)) {
+                        float[] p = position(a);
+                        if (p[0] < pos[1] - 0.01f && pos[0] < p[1] - 0.01f) { overlapped = true; break; }
                     }
                     if (overlapped) continue;
                 }
@@ -522,19 +513,16 @@ public class TimetableView extends View {
                 int lane = 0;
                 int lanes = 1;
                 if (isActive) {
-                    List<Timetable.Session> g = activeGroups.get(s.dayOfWeek * 100L + startSec);
-                    if (g != null && g.size() > 1) {
-                        lanes = g.size();
-                        lane = Math.max(0, g.indexOf(s));
-                    }
+                    int[] l = laneOf.get(s);
+                    if (l != null) { lane = l[0]; lanes = l[1]; }
                 }
 
                 float cellLeft = timeColWidth + (s.dayOfWeek - 1) * colWidth;
                 float laneW = colWidth / lanes;
                 float left = cellLeft + lane * laneW + padH;
                 float right = cellLeft + (lane + 1) * laneW - padH;
-                float top = sectionTopY(startSec) + padV;
-                float bottom = sectionBottomY(endSec) - padV;
+                float top = posY(pos[0]) + padV;
+                float bottom = posY(pos[1]) - padV;
                 RectF rect = new RectF(left, top, right, bottom);
                 if (rect.bottom <= headerHeight || rect.top >= getHeight()) continue;
 
@@ -575,6 +563,65 @@ public class TimetableView extends View {
             }
         }
         if (activePass) drawNowLine(canvas, colWidth);
+    }
+
+    /** 第 p 节边界（0 = 第 1 节顶部）对应的 y。 */
+    private float posY(float p) {
+        return headerHeight + p * rowHeight - scrollOffset;
+    }
+
+    /**
+     * 时段在网格里的起止位置，单位「节」（第 1 节顶部为 0）。
+     * 普通课按真实节次（可以是单节、三节）；自定义时间按作息表换算，不必对齐节次。
+     */
+    private float[] position(Timetable.Session s) {
+        if (s.hasCustomTime()) {
+            float a = minutesToPos(Timetable.Session.minutesOf(s.timeStart));
+            float b = minutesToPos(Timetable.Session.minutesOf(s.timeEnd));
+            if (b - a < 0.35f) b = Math.min(TOTAL_SECTIONS, a + 0.35f);  // 太短也要能点到
+            return new float[]{a, b};
+        }
+        int st = Math.max(1, Math.min(TOTAL_SECTIONS, s.startSection));
+        int en = Math.max(st, Math.min(TOTAL_SECTIONS, s.endSection));
+        return new float[]{st - 1, en};
+    }
+
+    /** 某个时刻落在网格的哪里：节内按比例，课间压到相邻边界上。 */
+    private float minutesToPos(int m) {
+        for (int sec = 1; sec <= TOTAL_SECTIONS; sec++) {
+            int st = schedule.startMinutes(sec);
+            int en = schedule.endMinutes(sec);
+            if (m <= st) return sec - 1;
+            if (m <= en) return sec - 1 + (m - st) / (float) Math.max(1, en - st);
+        }
+        return TOTAL_SECTIONS;
+    }
+
+    /** 同一天的时段按重叠分簇，簇内贪心分列；laneOf[s] = {第几列, 共几列}。 */
+    private void assignLanes(List<Timetable.Session> list, java.util.Map<Timetable.Session, int[]> laneOf) {
+        if (list.isEmpty()) return;
+        List<Timetable.Session> sorted = new ArrayList<>(list);
+        sorted.sort((x, y) -> Float.compare(position(x)[0], position(y)[0]));
+        List<Timetable.Session> cluster = new ArrayList<>();
+        List<Float> laneEnds = new ArrayList<>();
+        float clusterEnd = -1;
+        for (Timetable.Session s : sorted) {
+            float[] p = position(s);
+            if (!cluster.isEmpty() && p[0] >= clusterEnd - 0.01f) {
+                for (Timetable.Session c : cluster) laneOf.get(c)[1] = laneEnds.size();
+                cluster.clear();
+                laneEnds.clear();
+            }
+            int lane = -1;
+            for (int i = 0; i < laneEnds.size(); i++) {
+                if (laneEnds.get(i) <= p[0] + 0.01f) { lane = i; break; }
+            }
+            if (lane < 0) { lane = laneEnds.size(); laneEnds.add(p[1]); } else laneEnds.set(lane, p[1]);
+            laneOf.put(s, new int[]{lane, 1});
+            cluster.add(s);
+            clusterEnd = Math.max(clusterEnd, p[1]);
+        }
+        for (Timetable.Session c : cluster) laneOf.get(c)[1] = laneEnds.size();
     }
 
     /** 现在线：今天这一列里，按作息时间画一条朱砂发丝线 + 圆点。 */
@@ -637,9 +684,25 @@ public class TimetableView extends View {
 
         float usedHeight = titleLayout.getHeight();
 
-        // 教师名紧随课程名；为空时完全跳过，避免自定义课程出现空白行。
-        String teacher = (course.teacher != null && !course.teacher.trim().isEmpty())
-                ? course.teacher.trim() : "";
+        // 自定义时间（如考试）直接写在课程名下面
+        if (s.hasCustomTime() && innerTop + usedHeight + dp(12) <= innerBottom) {
+            subTextPaint.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.BOLD));
+            subTextPaint.setTextSize(sp(8.2f));
+            subTextPaint.setColor(textColor);
+            subTextPaint.setAlpha(isActive ? 235 : 165);
+            subTextPaint.setTextAlign(Paint.Align.LEFT);
+            String tl = s.timeStart + "–" + s.timeEnd;
+            canvas.translate(0, usedHeight + dp(3f));
+            StaticLayout timeLayout = StaticLayout.Builder
+                    .obtain(tl, 0, tl.length(), subTextPaint, Math.round(innerWidth))
+                    .setIncludePad(false).setMaxLines(2).build();
+            timeLayout.draw(canvas);
+            canvas.translate(0, -(usedHeight + dp(3f)));
+            usedHeight += dp(3f) + timeLayout.getHeight();
+        }
+
+        // 教师名紧随课程名；按周换老师的课显示本周那位。为空时完全跳过。
+        String teacher = s.teacherFor(currentWeek, course.teacher).trim();
         if (!teacher.isEmpty() && innerTop + usedHeight + dp(12) <= innerBottom) {
             subTextPaint.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
             subTextPaint.setTextSize(sp(8.2f));
@@ -899,7 +962,7 @@ public class TimetableView extends View {
             int day = Math.min(columnCount(), Math.max(1, (int) ((x - timeColWidth) / colWidth) + 1));
             for (int sec = 1; sec <= TOTAL_SECTIONS; sec++) {
                 if (y >= sectionTopY(sec) && y <= sectionBottomY(sec)) {
-                    listener.onEmptySlotClick(day, pairStart(sec));
+                    listener.onEmptySlotClick(day, sec);
                     return;
                 }
             }
