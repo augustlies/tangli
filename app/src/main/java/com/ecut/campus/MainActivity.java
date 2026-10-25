@@ -965,6 +965,8 @@ public class MainActivity extends AppCompatActivity {
         View aboutCard = settingsFragment.findViewById(R.id.card_about);
         if (aboutCard != null) aboutCard.setOnClickListener(v ->
                 startActivity(new Intent(this, AboutActivity.class)));
+        View starTv = settingsFragment.findViewById(R.id.tv_about_star);
+        if (starTv != null) starTv.setOnClickListener(v -> Updater.open(this, Updater.REPO_URL));
 
         // ===== 0.4：一级只放入口，二级页在 fragment 内切换 =====
         View campusRow = settingsFragment.findViewById(R.id.row_settings_campus);
@@ -1422,6 +1424,8 @@ public class MainActivity extends AppCompatActivity {
             lastShownDay = today;
             Prefs.setCurrentWeek(this, actualCurrentWeek());
         }
+        // 刚从统一门户登录回来：第一次弹出上手引导
+        LoginGuide.maybeShow(this, this::syncTimetable);
         boolean justCreated = skipNextResumeRefresh;
         skipNextResumeRefresh = false;
         // onCreate 刚刷新过一遍，冷启动不重复读盘重绘

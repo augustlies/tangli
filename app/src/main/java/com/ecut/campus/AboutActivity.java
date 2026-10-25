@@ -33,7 +33,7 @@ public class AboutActivity extends AppCompatActivity {
 
         Ui.label(this, col, "PROJECT · 项目");
         LinearLayout c1 = Ui.card(this, col);
-        Ui.row(this, c1, "01", "GitHub 项目主页", "github.com/" + Updater.REPO, "↗ WEB",
+        Ui.row(this, c1, "01", "GitHub 项目主页", "觉得好用就点个 Star，让更多同学找到它", "★ STAR",
                 v -> Updater.open(this, Updater.REPO_URL));
         View upd = Ui.row(this, c1, "02", "检查更新", "正在检查…", "…", v -> check(true));
         bindUpdateRow(upd);
@@ -45,6 +45,9 @@ public class AboutActivity extends AppCompatActivity {
                     Prefs.setUpdateAutoCheck(this, on);
                     recreate();
                 });
+
+        Ui.row(this, c1, "05", "使用指南", "登录后怎么同步课表、查成绩、去广告", "?",
+                v -> LoginGuide.show(this, null));
 
         Ui.label(this, col, "FEEDBACK · 问题反馈");
         LinearLayout c2 = Ui.card(this, col);

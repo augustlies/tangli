@@ -746,6 +746,17 @@
                     android:textSize="12sp" />
 
                 <TextView
+                    android:id="@+id/tv_about_star"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:paddingVertical="4dp"
+                    android:text="★ 觉得好用？去 GitHub 点个 Star，让更多同学找到它"
+                    android:textColor="@color/g_ink"
+                    android:textSize="12sp" />
+
+                <TextView
                     android:id="@+id/tv_about_more"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
