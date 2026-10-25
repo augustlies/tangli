@@ -39,6 +39,12 @@ public class TimetableView extends View {
         void onWeekSwipe(int delta);
         /** 松手判定翻页的瞬间回调，用于立即更新周数标题。 */
         default void onWeekSettling(int delta) {}
+        /** 点到带标记的块：停课/放假/已调走（原课程）或补课/调课（本周临时加的）。 */
+        default void onMarkedClick(Timetable.Course course, Timetable.Session session,
+                                   String label, String adjustId, boolean extra) {}
+        /** 长按课块。 */
+        default void onSessionLongPress(Timetable.Course course, Timetable.Session session, boolean active,
+                                        String label, String adjustId, boolean extra, int week) {}
     }
 
     public interface OnVerticalScrollListener {
@@ -108,6 +114,11 @@ public class TimetableView extends View {
     private final TextPaint subTextPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
 
     private final List<HitBlock> hitBlocks = new ArrayList<>();
+    /** 每周的停课/调课/放假叠加层，按周缓存，课表或开学日期变了就清空。 */
+    private final java.util.Map<Integer, com.ecut.campus.data.WeekOverlay> overlays = new java.util.HashMap<>();
+    private com.ecut.campus.data.WeekOverlay overlay = com.ecut.campus.data.WeekOverlay.empty(0);
+    private final Runnable longPressRunnable = this::fireLongPress;
+    private boolean longPressFired;
     private final int touchSlop;
 
     private float headerHeight;
@@ -135,6 +146,9 @@ public class TimetableView extends View {
         final Timetable.Course course;
         final Timetable.Session session;
         final boolean active;
+        String label;      // 非空 = 带标记（停课/放假/已调走/补课/调课）
+        String adjustId = "";
+        boolean extra;
 
         HitBlock(RectF rect, Timetable.Course course, Timetable.Session session, boolean active) {
             this.rect = rect;
@@ -172,6 +186,7 @@ public class TimetableView extends View {
 
     public void setSemesterStartDate(String startDate) {
         this.semesterStartDate = startDate == null ? "" : startDate;
+        overlays.clear();
         invalidate();
     }
 
@@ -186,6 +201,7 @@ public class TimetableView extends View {
 
     public void setTimetable(Timetable t, int week) {
         this.timetable = (t != null) ? t : new Timetable();
+        overlays.clear();
         this.currentWeek = clampWeek(week);
         this.todayDayOfWeek = WeekMath.todayDayOfWeek();
         cancelPageAnimation();
@@ -364,6 +380,7 @@ public class TimetableView extends View {
         List<HitBlock> savedHits = isPrimary ? null : new ArrayList<>(hitBlocks);
         if (!isPrimary) hitBlocks.clear();
         currentWeek = week;
+        overlay = overlayFor(week);
 
         canvas.save();
         canvas.translate(xOffset, 0);
@@ -434,7 +451,15 @@ public class TimetableView extends View {
             subTextPaint.setTextSize(sp(9.5f));
             subTextPaint.setTextAlign(Paint.Align.CENTER);
             subTextPaint.setColor(isToday ? ACCENT : INK_3);
-            canvas.drawText(dateLabels[d - 1], cx, dp(39), subTextPaint);
+            String dayLabel = overlay.dayLabels[d];
+            if (dayLabel != null) {
+                // 放假 / 补课日：日期换成标签
+                subTextPaint.setTypeface(Typeface.DEFAULT_BOLD);
+                subTextPaint.setColor(overlay.dayOff[d] ? ACCENT : INK);
+                canvas.drawText(dayLabel.length() > 4 ? dayLabel.substring(0, 4) : dayLabel, cx, dp(39), subTextPaint);
+            } else {
+                canvas.drawText(dateLabels[d - 1], cx, dp(39), subTextPaint);
+            }
         }
 
         canvas.drawLine(0, headerHeight, w, headerHeight, gridPaint);
@@ -470,99 +495,138 @@ public class TimetableView extends View {
         }
     }
 
+    private com.ecut.campus.data.WeekOverlay overlayFor(int week) {
+        com.ecut.campus.data.WeekOverlay o = overlays.get(week);
+        if (o == null) {
+            o = com.ecut.campus.data.WeekOverlay.build(timetable, semesterStartDate, week);
+            overlays.put(week, o);
+        }
+        return o;
+    }
+
     private void drawCourseBlocks(Canvas canvas, float colWidth, boolean activePass) {
         if (timetable == null || timetable.courses == null) return;
 
-        // 本周课程按真实起止位置（节次或自定义时间）算重叠；重叠的一簇按列并排，全部可点。
-        java.util.Map<Timetable.Session, int[]> laneOf = new java.util.HashMap<>();
+        // 本周真正要上的课（去掉停课/放假，加上补课/调来的）按真实起止位置算重叠；重叠的一簇按列并排，全部可点。
+        java.util.Map<Timetable.Session, int[]> laneOf = new java.util.IdentityHashMap<>();
         List<List<Timetable.Session>> perDay = new ArrayList<>();
         for (int d = 0; d <= 7; d++) perDay.add(new ArrayList<>());
         for (Timetable.Course c : timetable.courses) {
             for (Timetable.Session s : c.sessions) {
                 if (s.dayOfWeek < 1 || s.dayOfWeek > columnCount()) continue;
-                if (s.isActive(currentWeek)) perDay.get(s.dayOfWeek).add(s);
+                if (s.isActive(currentWeek) && !overlay.cancelled.containsKey(s)) perDay.get(s.dayOfWeek).add(s);
             }
+        }
+        for (com.ecut.campus.data.WeekOverlay.Extra e : overlay.extras) {
+            int d = e.session.dayOfWeek;
+            if (d >= 1 && d <= columnCount()) perDay.get(d).add(e.session);
         }
         for (int d = 1; d <= 7; d++) assignLanes(perDay.get(d), laneOf);
 
-        float padH = dp(1.6f);
-        float padV = dp(1.6f);
-        float radius = dp(3f);
-
         for (Timetable.Course course : timetable.courses) {
-            int colorIdx = Math.abs(course.colorIndex) % PALETTE_BG.length;
-            int bgColor = PALETTE_BG[colorIdx];
-            int fgColor = PALETTE_FG[colorIdx];
-
             for (Timetable.Session s : course.sessions) {
                 if (s.dayOfWeek < 1 || s.dayOfWeek > columnCount()) continue;
                 boolean isActive = s.isActive(currentWeek);
-                if (isActive != activePass) continue;
-
-                float[] pos = position(s);
-
-                if (!isActive) {
-                    boolean overlapped = false;
-                    for (Timetable.Session a : perDay.get(s.dayOfWeek)) {
-                        float[] p = position(a);
-                        if (p[0] < pos[1] - 0.01f && pos[0] < p[1] - 0.01f) { overlapped = true; break; }
-                    }
-                    if (overlapped) continue;
+                com.ecut.campus.data.WeekOverlay.Mark mark = isActive ? overlay.cancelled.get(s) : null;
+                // 被停/放假/调走的课总是画出来（虚线 + 标签），不受「显示非本周」开关影响
+                boolean pass = mark != null || isActive;
+                if (pass != activePass) continue;
+                boolean solid = isActive && mark == null;
+                if (!solid && overlapsActive(s, perDay.get(s.dayOfWeek))) continue;
+                String tag = mark != null ? "[" + mark.label + "] " : null;
+                HitBlock hb = drawBlock(canvas, colWidth, course, s, solid, tag, laneOf.get(s));
+                if (hb != null && mark != null) {
+                    hb.label = mark.label;
+                    hb.adjustId = mark.adjustId;
                 }
-
-                int lane = 0;
-                int lanes = 1;
-                if (isActive) {
-                    int[] l = laneOf.get(s);
-                    if (l != null) { lane = l[0]; lanes = l[1]; }
-                }
-
-                float cellLeft = timeColWidth + (s.dayOfWeek - 1) * colWidth;
-                float laneW = colWidth / lanes;
-                float left = cellLeft + lane * laneW + padH;
-                float right = cellLeft + (lane + 1) * laneW - padH;
-                float top = posY(pos[0]) + padV;
-                float bottom = posY(pos[1]) - padV;
-                RectF rect = new RectF(left, top, right, bottom);
-                if (rect.bottom <= headerHeight || rect.top >= getHeight()) continue;
-
-                if (isActive) {
-                    blockPaint.setStyle(Paint.Style.FILL);
-                    blockPaint.setColor(bgColor);
-                    canvas.drawRoundRect(rect, radius, radius, blockPaint);
-
-                    // 发丝书脊：左侧 2dp 实色
-                    accentPaint.setStyle(Paint.Style.FILL);
-                    accentPaint.setColor(fgColor);
-                    canvas.drawRect(left, top, left + dp(2f), bottom, accentPaint);
-
-                    if (lanes > 1) {
-                        // 冲突角标：朱砂小方块 + 数量
-                        float bs = dp(11);
-                        RectF badge = new RectF(right - bs - dp(2), top + dp(2), right - dp(2), top + dp(2) + bs);
-                        badgePaint.setColor(ACCENT);
-                        canvas.drawRoundRect(badge, dp(2), dp(2), badgePaint);
-                        subTextPaint.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.BOLD));
-                        subTextPaint.setTextSize(sp(7.5f));
-                        subTextPaint.setColor(PAPER);
-                        subTextPaint.setAlpha(255);
-                        subTextPaint.setTextAlign(Paint.Align.CENTER);
-                        canvas.drawText(String.valueOf(lanes), badge.centerX(), badge.centerY() + dp(2.7f), subTextPaint);
-                    }
-                } else {
-                    blockPaint.setStyle(Paint.Style.STROKE);
-                    blockPaint.setStrokeWidth(Math.max(1f, dp(0.7f)));
-                    blockPaint.setColor(G.alpha(G.INK, 0x24));
-                    blockPaint.setPathEffect(new android.graphics.DashPathEffect(new float[]{dp(3), dp(2.5f)}, 0));
-                    canvas.drawRoundRect(rect, radius, radius, blockPaint);
-                    blockPaint.setPathEffect(null);
-                }
-
-                drawBlockText(canvas, rect, course, s, isActive, isActive ? fgColor : INK_3);
-                hitBlocks.add(new HitBlock(rect, course, s, isActive));
             }
         }
-        if (activePass) drawNowLine(canvas, colWidth);
+        if (activePass) {
+            for (com.ecut.campus.data.WeekOverlay.Extra e : overlay.extras) {
+                int d = e.session.dayOfWeek;
+                if (d < 1 || d > columnCount()) continue;
+                HitBlock hb = drawBlock(canvas, colWidth, e.course, e.session, true,
+                        "[" + e.label + "] ", laneOf.get(e.session));
+                if (hb != null) {
+                    hb.label = e.label;
+                    hb.adjustId = e.adjustId;
+                    hb.extra = true;
+                }
+            }
+            drawNowLine(canvas, colWidth);
+        }
+    }
+
+    private boolean overlapsActive(Timetable.Session s, List<Timetable.Session> active) {
+        float[] pos = position(s);
+        for (Timetable.Session a : active) {
+            if (a == s) continue;
+            float[] p = position(a);
+            if (p[0] < pos[1] - 0.01f && pos[0] < p[1] - 0.01f) return true;
+        }
+        return false;
+    }
+
+    /** 画一个课块并登记点击区域；不在可见范围返回 null。 */
+    private HitBlock drawBlock(Canvas canvas, float colWidth, Timetable.Course course, Timetable.Session s,
+                              boolean isActive, String tag, int[] laneInfo) {
+        int colorIdx = Math.abs(course.colorIndex) % PALETTE_BG.length;
+        int bgColor = PALETTE_BG[colorIdx];
+        int fgColor = PALETTE_FG[colorIdx];
+        float padH = dp(1.6f);
+        float padV = dp(1.6f);
+        float radius = dp(3f);
+        float[] pos = position(s);
+
+        int lane = 0;
+        int lanes = 1;
+        if (isActive && laneInfo != null) { lane = laneInfo[0]; lanes = laneInfo[1]; }
+
+        float cellLeft = timeColWidth + (s.dayOfWeek - 1) * colWidth;
+        float laneW = colWidth / lanes;
+        float left = cellLeft + lane * laneW + padH;
+        float right = cellLeft + (lane + 1) * laneW - padH;
+        float top = posY(pos[0]) + padV;
+        float bottom = posY(pos[1]) - padV;
+        RectF rect = new RectF(left, top, right, bottom);
+        if (rect.bottom <= headerHeight || rect.top >= getHeight()) return null;
+
+        if (isActive) {
+            blockPaint.setStyle(Paint.Style.FILL);
+            blockPaint.setColor(bgColor);
+            canvas.drawRoundRect(rect, radius, radius, blockPaint);
+
+            // 发丝书脊：左侧 2dp 实色
+            accentPaint.setStyle(Paint.Style.FILL);
+            accentPaint.setColor(fgColor);
+            canvas.drawRect(left, top, left + dp(2f), bottom, accentPaint);
+
+            if (lanes > 1) {
+                // 冲突角标：朱砂小方块 + 数量
+                float bs = dp(11);
+                RectF badge = new RectF(right - bs - dp(2), top + dp(2), right - dp(2), top + dp(2) + bs);
+                badgePaint.setColor(ACCENT);
+                canvas.drawRoundRect(badge, dp(2), dp(2), badgePaint);
+                subTextPaint.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.BOLD));
+                subTextPaint.setTextSize(sp(7.5f));
+                subTextPaint.setColor(PAPER);
+                subTextPaint.setAlpha(255);
+                subTextPaint.setTextAlign(Paint.Align.CENTER);
+                canvas.drawText(String.valueOf(lanes), badge.centerX(), badge.centerY() + dp(2.7f), subTextPaint);
+            }
+        } else {
+            blockPaint.setStyle(Paint.Style.STROKE);
+            blockPaint.setStrokeWidth(Math.max(1f, dp(0.7f)));
+            blockPaint.setColor(tag != null ? G.alpha(ACCENT, 0x66) : G.alpha(G.INK, 0x24));
+            blockPaint.setPathEffect(new android.graphics.DashPathEffect(new float[]{dp(3), dp(2.5f)}, 0));
+            canvas.drawRoundRect(rect, radius, radius, blockPaint);
+            blockPaint.setPathEffect(null);
+        }
+
+        drawBlockText(canvas, rect, course, s, isActive, isActive ? fgColor : INK_3, tag);
+        HitBlock hb = new HitBlock(rect, course, s, isActive);
+        hitBlocks.add(hb);
+        return hb;
     }
 
     /** 第 p 节边界（0 = 第 1 节顶部）对应的 y。 */
@@ -651,7 +715,7 @@ public class TimetableView extends View {
     }
 
     private void drawBlockText(Canvas canvas, RectF rect, Timetable.Course course,
-                               Timetable.Session s, boolean isActive, int textColor) {
+                               Timetable.Session s, boolean isActive, int textColor, String tag) {
         float innerLeft = rect.left + (isActive ? dp(6.2f) : dp(4.0f));
         float innerRight = rect.right - dp(2.2f);
         float innerWidth = Math.max(dp(16), innerRight - innerLeft);
@@ -668,7 +732,8 @@ public class TimetableView extends View {
         textPaint.setTextAlign(Paint.Align.LEFT);
 
         String title = course.name != null ? course.name : "";
-        if (!isActive) title = "[非本周] " + title;
+        if (tag != null) title = tag + title;
+        else if (!isActive) title = "[非本周] " + title;
 
         StaticLayout titleLayout = StaticLayout.Builder
                 .obtain(title, 0, title.length(), textPaint, Math.round(innerWidth))
@@ -856,6 +921,9 @@ public class TimetableView extends View {
                 // 从吸附动画中途接管时，保留当前页位置，继续跟手。
                 gestureMode = 0;
                 moved = false;
+                longPressFired = false;
+                removeCallbacks(longPressRunnable);
+                postDelayed(longPressRunnable, android.view.ViewConfiguration.getLongPressTimeout());
                 return true;
 
             case MotionEvent.ACTION_MOVE: {
@@ -874,6 +942,7 @@ public class TimetableView extends View {
                         if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(true);
                     }
                 }
+                if (gestureMode != 0) removeCallbacks(longPressRunnable);
                 if (gestureMode == 1) {
                     dragDx = resistDrag(dx);
                     invalidate();
@@ -887,6 +956,7 @@ public class TimetableView extends View {
             }
 
             case MotionEvent.ACTION_UP: {
+                removeCallbacks(longPressRunnable);
                 if (gestureMode == 2 && verticalScrollListener != null) {
                     verticalScrollListener.onVerticalScrollEnd();
                 }
@@ -894,7 +964,7 @@ public class TimetableView extends View {
                     velocityTracker.computeCurrentVelocity(1000, dp(6000));
                     float velocityX = velocityTracker.getXVelocity(activePointerId);
                     settlePage(dragDx < 0 ? 1 : (dragDx > 0 ? -1 : 0), velocityX);
-                } else if (!moved) {
+                } else if (!moved && !longPressFired) {
                     handleTap(event.getX(), event.getY());
                 }
                 finishGesture();
@@ -903,6 +973,7 @@ public class TimetableView extends View {
             }
 
             case MotionEvent.ACTION_CANCEL:
+                removeCallbacks(longPressRunnable);
                 if (gestureMode == 2 && verticalScrollListener != null) {
                     verticalScrollListener.onVerticalScrollEnd();
                 }
@@ -952,7 +1023,8 @@ public class TimetableView extends View {
         for (int i = hitBlocks.size() - 1; i >= 0; i--) {
             HitBlock b = hitBlocks.get(i);
             if (b.rect.contains(x, y)) {
-                listener.onSessionClick(b.course, b.session, b.active);
+                if (b.label != null) listener.onMarkedClick(b.course, b.session, b.label, b.adjustId, b.extra);
+                else listener.onSessionClick(b.course, b.session, b.active);
                 return;
             }
         }
@@ -965,6 +1037,21 @@ public class TimetableView extends View {
                     listener.onEmptySlotClick(day, sec);
                     return;
                 }
+            }
+        }
+    }
+
+    private void fireLongPress() {
+        if (listener == null || gestureMode != 0 || moved || pageAnimating) return;
+        if (downY < headerHeight) return;
+        for (int i = hitBlocks.size() - 1; i >= 0; i--) {
+            HitBlock b = hitBlocks.get(i);
+            if (b.rect.contains(downX, downY)) {
+                longPressFired = true;
+                performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                listener.onSessionLongPress(b.course, b.session, b.active, b.label,
+                        b.adjustId, b.extra, currentWeek);
+                return;
             }
         }
     }
