@@ -33,6 +33,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- tangli://cmd?t=烫梨指令：点链接直接打开预览（仍需确认） -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="tangli" />
+            </intent-filter>
         </activity>
 
         <activity
@@ -73,6 +80,10 @@
             android:label="课程"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".DebugActivity"
+            android:exported="false" />
 
         <activity
             android:name=".AboutActivity"
