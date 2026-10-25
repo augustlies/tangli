@@ -206,6 +206,22 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 @Override
+                public void onMarkedClick(Timetable.Course course, Timetable.Session session,
+                                          String label, String adjustId, boolean extra) {
+                    CommandUi.onMarked(MainActivity.this, course, session, label, adjustId, extra,
+                            MainActivity.this::refreshTimetableTab, MainActivity.this::openCourseEditor);
+                }
+
+                @Override
+                public void onSessionLongPress(Timetable.Course course, Timetable.Session session,
+                                               boolean active, String label, String adjustId,
+                                               boolean extra, int week) {
+                    CommandUi.onLongPress(MainActivity.this, course, session, active, label, adjustId,
+                            extra, week, MainActivity.this::refreshTimetableTab,
+                            MainActivity.this::openCourseEditor);
+                }
+
+                @Override
                 public void onWeekSettling(int delta) {
                     // 手指一松就先翻标题，不等吸附动画结束
                     int total = Prefs.totalWeeks(MainActivity.this);
@@ -253,8 +269,15 @@ public class MainActivity extends AppCompatActivity {
                 .add("课表设置")
                 .divider()
                 .add("导出课表 (ICS)")
+                .divider()
+                .add("用 AI 改课表")
+                .add("粘贴烫梨指令")
+                .add("分享为烫梨指令")
                 .show(anchor, title -> {
-                    if ("切换学期".equals(title)) showSemesterPicker();
+                    if ("用 AI 改课表".equals(title)) CommandUi.copyAiGuide(this);
+                    else if ("粘贴烫梨指令".equals(title)) CommandUi.showPasteDialog(this, this::refreshTimetableTab);
+                    else if ("分享为烫梨指令".equals(title)) CommandUi.exportForShare(this);
+                    else if ("切换学期".equals(title)) showSemesterPicker();
                     else if ("同步课表".equals(title)) syncTimetable();
                     else if ("同步历史学期".equals(title)) syncHistorySemesters();
                     else if ("作息时间".equals(title)) {
@@ -1344,9 +1367,20 @@ public class MainActivity extends AppCompatActivity {
                         activeSync = null;
                         refreshTimetableTab();
                         refreshSettingsTab();
-                        Toast.makeText(MainActivity.this,
-                                kind.label + "已更新：" + count + " 门",
-                                Toast.LENGTH_SHORT).show();
+                        String diff = kind == CampusSyncClient.Kind.TIMETABLE
+                                ? CampusSyncClient.lastTimetableDiff : "";
+                        CampusSyncClient.lastTimetableDiff = "";
+                        if (diff != null && !diff.isEmpty()) {
+                            new AlertDialog.Builder(MainActivity.this)
+                                    .setTitle("课表有变化")
+                                    .setMessage(diff)
+                                    .setPositiveButton("知道了", null)
+                                    .show();
+                        } else {
+                            Toast.makeText(MainActivity.this,
+                                    kind.label + "已更新：" + count + " 门",
+                                    Toast.LENGTH_SHORT).show();
+                        }
                     }
 
                     @Override
@@ -1414,6 +1448,13 @@ public class MainActivity extends AppCompatActivity {
                 Toast.makeText(this, "导入失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
             }
         }
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        // Android 10+ 只有拿到焦点后才能读剪贴板：复制了 AI 给的烫梨指令，回来就弹预览
+        if (hasFocus) CommandUi.checkClipboard(this, this::refreshTimetableTab);
     }
 
     @Override
