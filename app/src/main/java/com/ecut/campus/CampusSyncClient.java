@@ -68,8 +68,8 @@ public final class CampusSyncClient {
             "/jwglxt/kbcx/xskbcx_cxXskbcxIndex.html?gnmkdm=N2151&layout=default";
     private static final String GRADES_PATH =
             "/jwglxt/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005&layout=default";
-    private static final long NAVIGATION_TIMEOUT_MS = 30_000L;
-    private static final long DATA_TIMEOUT_MS = 13_000L;
+    private static final long NAVIGATION_TIMEOUT_MS = 45_000L;
+    private static final long DATA_TIMEOUT_MS = 20_000L;
     private static final Pattern PROXY_HOST = Pattern.compile(
             "([0-9]{1,3}-[0-9]{1,3}-[0-9]{1,3}-[0-9]{1,3}\\.atrust\\.ecut\\.edu\\.cn)");
 
@@ -133,6 +133,8 @@ public final class CampusSyncClient {
                                          String xnm, String xqm, Callback callback) {
         CampusSyncClient client = new CampusSyncClient(view, kind, xnm, xqm, callback);
         client.running = true;
+        DiagLog.log(view.getContext(), "sync", "开始同步 " + kind.label
+                + (xnm != null ? " xnm=" + xnm + " xqm=" + xqm : ""));
         client.configure();
         client.load();
         return client;
@@ -158,12 +160,12 @@ public final class CampusSyncClient {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
-                Log.i(TAG, kind.label + " page: " + url);
+                dlog(kind.label + " page: " + url);
             }
 
             @Override
             public void onPageFinished(WebView view, String url) {
-                Log.i(TAG, kind.label + " finished: " + url);
+                dlog(kind.label + " finished: " + url);
                 if (finished) return;
                 if (url == null) return;
                 capturePortalHost(url);
@@ -174,7 +176,7 @@ public final class CampusSyncClient {
                     } else if (fallbackStarted && cardClicked) {
                         // 办事大厅已点击卡片、直达重试尚未发出时忽略；
                         // 5 秒后的直达重试若仍失败会走超时兜底。
-                        Log.i(TAG, kind.label + " login page after card click, waiting for retry");
+                        dlog(kind.label + " login page after card click, waiting for retry");
                     } else {
                         Prefs.setPortalSession(appContext, false);
                         fail("统一门户登录已失效，请先在设置页重新登录");
@@ -210,7 +212,7 @@ public final class CampusSyncClient {
             public void onReceivedError(WebView view, WebResourceRequest request,
                                         android.webkit.WebResourceError error) {
                 if (request.isForMainFrame()) {
-                    Log.w(TAG, kind.label + " page error: "
+                    dlog(kind.label + " page error: "
                             + error.getDescription() + " @ " + request.getUrl());
                 }
             }
@@ -256,15 +258,11 @@ public final class CampusSyncClient {
 
     private void load() {
         handler.postDelayed(timeout, NAVIGATION_TIMEOUT_MS);
-        String host = Prefs.portalHost(appContext);
-        if (host != null && !host.trim().isEmpty()) {
-            directAttempted = true;
-            String url = targetUrl(host, kind);
-            Log.i(TAG, kind.label + " direct: " + url);
-            webView.loadUrl(url);
-        } else {
-            startEhallFallback("没有缓存的教务节点");
-        }
+        // 没有缓存节点时直接用学校固定的零信任教务节点；直达被要求登录再走办事大厅。
+        directAttempted = true;
+        String url = targetUrl(hostOrDefault(), kind);
+        dlog(kind.label + " direct: " + url);
+        webView.loadUrl(url);
     }
 
     private void clickEhallCard() {
@@ -289,7 +287,7 @@ public final class CampusSyncClient {
                 "})()";
         webView.evaluateJavascript(js, r -> {
             String value = WebShellActivity.unwrapJsString(r);
-            Log.i(TAG, kind.label + " card: " + value);
+            dlog(kind.label + " card: " + value);
             if (value.startsWith("CLICKED")) {
                 cardClicked = true;
                 handler.removeCallbacks(poll);
@@ -307,10 +305,8 @@ public final class CampusSyncClient {
 
     private void retryDirectAfterEhallHop() {
         if (finished || dataRequested) return;
-        String host = Prefs.portalHost(appContext);
-        if (host == null || host.trim().isEmpty()) return;
-        String url = targetUrl(host, kind);
-        Log.i(TAG, kind.label + " retry direct after ehall hop: " + url);
+        String url = targetUrl(hostOrDefault(), kind);
+        dlog(kind.label + " retry direct after ehall hop: " + url);
         webView.loadUrl(url);
     }
 
@@ -333,7 +329,7 @@ public final class CampusSyncClient {
             if (src == null || src.isEmpty() || "about:blank".equals(src)) return;
             openedAppFrameLoaded = true;
             String url = resolveEhallUrl(src);
-            Log.i(TAG, kind.label + " app frame: " + url);
+            dlog(kind.label + " app frame: " + url);
             if (isAllowed(url)) webView.loadUrl(url);
         });
     }
@@ -345,8 +341,7 @@ public final class CampusSyncClient {
         dataRequested = false;
         pollAttempts = 0;
         ehallLoginChecks = 0;
-        Log.i(TAG, kind.label + " fallback: " + reason);
-        DiagLog.log(appContext, "sync", kind.label + " fallback: " + reason);
+        dlog(kind.label + " fallback: " + reason);
         webView.stopLoading();
         webView.loadUrl(EHALL_PROXY_HOME);
         handler.postDelayed(poll, 1_500L);
@@ -424,7 +419,7 @@ public final class CampusSyncClient {
             }
             SemesterArchive.unifyColors(appContext);
             Prefs.setLastSyncTime(appContext, now());
-            Log.i(TAG, "Timetable saved: " + merged.courses.size()
+            dlog("Timetable saved: " + merged.courses.size()
                     + " courses (" + result.rawRecords + " records)");
             Prefs.setPortalSession(appContext, true);
             finishSuccess(merged.courses.size());
@@ -454,7 +449,7 @@ public final class CampusSyncClient {
                 "}catch(e){return 'ERR:'+e;}" +
                 "return 'READY';})()";
         webView.evaluateJavascript(trigger, r -> {
-            Log.i(TAG, "GRADE_TRIGGER: " + r);
+            dlog("GRADE_TRIGGER: " + r);
             logGradePageDiagnostics();
             handler.postDelayed(this::readGradeRows, 3_200L);
             handler.postDelayed(this::readGradeRows, 6_500L);
@@ -473,7 +468,7 @@ public final class CampusSyncClient {
                 "return JSON.stringify({xnm:opts('xnm'),xqm:opts('xqm'),pg:pgopts()," +
                 "rows:t&&t.rows?t.rows.length:-1});" +
                 "})()";
-        webView.evaluateJavascript(js, raw -> Log.i(TAG, "GRADE_DIAG: "
+        webView.evaluateJavascript(js, raw -> dlog("GRADE_DIAG: "
                 + WebShellActivity.unwrapJsString(raw)));
     }
 
@@ -482,7 +477,9 @@ public final class CampusSyncClient {
         gradeReadAttempts++;
         String js = "(function(){" +
                 "var t=document.getElementById('tabGrid');" +
-                "if(!t||!t.rows||t.rows.length<=1)return '';" +
+                "if(!t||!t.rows||t.rows.length<=1){" +
+                "var b=(document.body&&document.body.innerText)||'';" +
+                "return /无(操作)?权限/.test(b)?'__NOPERM__':'';}" +
                 "var rows=[];" +
                 "for(var i=0;i<t.rows.length;i++){" +
                 "var row=[];var cs=t.rows[i].cells;" +
@@ -491,6 +488,11 @@ public final class CampusSyncClient {
                 "return JSON.stringify({rows:rows});})()";
         webView.evaluateJavascript(js, raw -> {
             String decoded = WebShellActivity.unwrapJsString(raw);
+            if ("__NOPERM__".equals(decoded)) {
+                fail("教务系统提示「无操作权限」：学校没给这个账号开放成绩查询（新生还没有成绩、评教没做完或查询未开放），"
+                        + "在教务网页里能查到后再同步");
+                return;
+            }
             if (decoded == null || decoded.isEmpty()) {
                 if (gradeReadAttempts >= 2) fail("成绩表格没有返回数据");
                 return;
@@ -502,7 +504,7 @@ public final class CampusSyncClient {
                 if (semesters.length() > 0) semesters.append(", ");
                 semesters.append(sem.id).append('=').append(sem.courses.size());
             }
-            Log.i(TAG, "GRADE_ROWS: " + decoded.length()
+            dlog("GRADE_ROWS: " + decoded.length()
                     + " chars, courses=" + count + ", semesters=[" + semesters + "]");
             if (count <= 0) {
                 if (gradeReadAttempts >= 2) fail("成绩解析为空，请稍后重试");
@@ -535,7 +537,7 @@ public final class CampusSyncClient {
             }
             Prefs.setGradesDemo(appContext, false);
             Prefs.setLastSyncTime(appContext, now());
-            Log.i(TAG, "Grades replaced: " + parsed.totalCourseCount()
+            dlog("Grades replaced: " + parsed.totalCourseCount()
                     + " courses in " + parsed.semesters.size() + " semesters");
             Prefs.setPortalSession(appContext, true);
             finishSuccess(parsed.totalCourseCount());
@@ -607,6 +609,14 @@ public final class CampusSyncClient {
         return CampusUrlPolicy.isEhallUrl(url);
     }
 
+    /** 学校教务系统在零信任网关下的固定节点。 */
+    static final String DEFAULT_JW_HOST = "172-20-130-13.atrust.ecut.edu.cn";
+
+    private String hostOrDefault() {
+        String host = Prefs.portalHost(appContext);
+        return host == null || host.trim().isEmpty() ? DEFAULT_JW_HOST : host.trim();
+    }
+
     static String targetUrl(String host, Kind kind) {
         String path = kind == Kind.TIMETABLE ? TIMETABLE_PATH : GRADES_PATH;
         return "https://" + host + path;
@@ -634,9 +644,16 @@ public final class CampusSyncClient {
         finished = true;
         running = false;
         Prefs.setSessionExpired(appContext, false);
+        DiagLog.log(appContext, "sync", kind.label + " 成功: " + count);
         if (kind == Kind.TIMETABLE) Prefs.setTimetableSyncedAt(appContext, System.currentTimeMillis());
         cleanup();
         callback.onSuccess(count);
+    }
+
+    /** 同步过程全程记到诊断日志（URL 参数、长数字会被脱敏）。 */
+    private void dlog(String m) {
+        Log.i(TAG, m);
+        DiagLog.log(appContext, "sync", m);
     }
 
     private void fail(String message) {

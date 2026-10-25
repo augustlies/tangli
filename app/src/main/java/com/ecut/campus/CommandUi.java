@@ -45,6 +45,7 @@ final class CommandUi {
         e.start = start == null || start.isEmpty() ? "" : WeekMath.normalizeToMonday(start);
         e.today = WeekMath.todayDateLabel();
         e.totalWeeks = Prefs.storedTotalWeeks(ctx);
+        e.settings = AppActions.currentSettings(ctx);
         ScheduleSettings ss = ScheduleSettingsStore.load(ctx);
         int n = ScheduleSettings.SECTION_COUNT;
         e.sectionStart = new int[n + 1];
@@ -150,14 +151,7 @@ final class CommandUi {
         AlertDialog.Builder b = new AlertDialog.Builder(a).setTitle(title).setView(sv);
         if (changes > 0) {
             b.setNegativeButton("取消", null);
-            b.setPositiveButton("应用", (dlg, w) -> {
-                if (!TimetableStore.save(a, plan.result)) {
-                    Toast.makeText(a, "保存失败", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                if (refresh != null) refresh.run();
-                undoBar(a, "已应用 " + changes + " 处改动", before, refresh);
-            });
+            b.setPositiveButton("应用", (dlg, w) -> apply(a, text, plan, before, refresh));
         } else {
             b.setPositiveButton("知道了", null);
         }
@@ -167,14 +161,157 @@ final class CommandUi {
         dialog.show();
     }
 
+    /** 应用顺序：课表 → 设置 → 作息 → 刷新 → 动作（同步/导出/打开）→ 最后切主题（会重建界面）。 */
+    private static void apply(Activity a, String text, TangliCommand.Plan plan, Timetable before, Runnable refresh) {
+        boolean tt = plan.timetableChanged() || plan.replaceAll;
+        if (tt && !TimetableStore.save(a, plan.result)) {
+            Toast.makeText(a, "保存失败", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        java.util.Map<String, String> oldSettings = AppActions.currentSettings(a);
+        String oldSchedule = AppActions.scheduleJson(a);
+        java.util.Map<String, String> settings = plan.settings();
+        boolean themeChanged = !settings.isEmpty() && AppActions.applySettings(a, settings);
+        if (plan.sectionsChanged && !AppActions.applySections(a, plan.sectionStart, plan.sectionEnd)) {
+            Toast.makeText(a, "作息保存失败", Toast.LENGTH_SHORT).show();
+        }
+        addHistory(a, text);
+        if (refresh != null) refresh.run();
+        boolean undoable = tt || !settings.isEmpty() || plan.sectionsChanged;
+        int actions = 0;
+        for (TangliCommand.Item it : plan.items) {
+            if (it.ok && it.changed && !it.action.isEmpty() && !"set".equals(it.action) && !"section".equals(it.action)) {
+                actions++;
+            }
+        }
+        if (undoable && !themeChanged) {
+            undoBar(a, "已应用 " + plan.changeCount() + " 处改动", tt ? before : null,
+                    settings.isEmpty() ? null : oldSettings, plan.sectionsChanged ? oldSchedule : null, refresh);
+        }
+        if (actions > 0) {
+            // 等对话框收起再跳转，避免叠在一起
+            View root = a.findViewById(android.R.id.content);
+            Runnable go = () -> {
+                for (TangliCommand.Item it : plan.items) {
+                    if (it.ok && it.changed && !it.action.isEmpty()
+                            && !"set".equals(it.action) && !"section".equals(it.action)) {
+                        AppActions.run(a, it);
+                    }
+                }
+            };
+            if (root != null) root.postDelayed(go, 250);
+            else go.run();
+        }
+        if (themeChanged) App.applyNightMode(Prefs.nightMode(a));
+    }
+
     private static void undoBar(Activity a, String msg, Timetable before, Runnable refresh) {
+        undoBar(a, msg, before, null, null, refresh);
+    }
+
+    private static void undoBar(Activity a, String msg, Timetable before, java.util.Map<String, String> oldSettings,
+                                String oldSchedule, Runnable refresh) {
         View root = a.findViewById(android.R.id.content);
         if (root == null) return;
         Snackbar.make(root, msg, 6000)
                 .setAction("撤销", v -> {
-                    TimetableStore.save(a, before);
+                    if (before != null) TimetableStore.save(a, before);
+                    if (oldSettings != null) AppActions.applySettings(a, oldSettings);
+                    if (oldSchedule != null) AppActions.restoreSchedule(a, oldSchedule);
                     if (refresh != null) refresh.run();
                 })
+                .show();
+    }
+
+    // ------------------------------------------------------------ 历史 / 链接 / 导出全部
+
+    private static final String KEY_HISTORY = "history";
+    private static final int HISTORY_MAX = 20;
+
+    static java.util.List<String> history(Context ctx) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        try {
+            org.json.JSONArray arr = new org.json.JSONArray(prefs(ctx).getString(KEY_HISTORY, "[]"));
+            for (int i = 0; i < arr.length(); i++) out.add(arr.optString(i, ""));
+        } catch (org.json.JSONException ignored) {
+            // 坏数据当空
+        }
+        return out;
+    }
+
+    private static void addHistory(Context ctx, String text) {
+        if (text == null || text.trim().isEmpty()) return;
+        java.util.List<String> h = history(ctx);
+        String t = text.trim();
+        String first = t.split("\n", 3).length > 1 ? t.split("\n", 3)[1] : t;
+        DiagLog.log(ctx, "cmd", "执行指令 " + t.split("\n").length + " 行 · " + (first.length() > 40 ? first.substring(0, 40) + "…" : first));
+        h.remove(t);
+        h.add(0, t);
+        org.json.JSONArray arr = new org.json.JSONArray();
+        for (int i = 0; i < Math.min(HISTORY_MAX, h.size()); i++) arr.put(h.get(i));
+        prefs(ctx).edit().putString(KEY_HISTORY, arr.toString()).apply();
+    }
+
+    static final String SCHEME = "tangli";
+
+    /** 指令 → tangli://cmd?t=…，点一下就能在烫梨里打开预览。 */
+    static String toLink(String text) {
+        try {
+            return SCHEME + "://cmd?t=" + java.net.URLEncoder.encode(text, "UTF-8").replace("+", "%20");
+        } catch (java.io.UnsupportedEncodingException e) {
+            return "";
+        }
+    }
+
+    /** 从 tangli:// 链接里取出指令；不是烫梨链接返回空串。 */
+    static String fromLink(android.net.Uri uri) {
+        if (uri == null || !SCHEME.equalsIgnoreCase(uri.getScheme())) return "";
+        String t = null;
+        try {
+            t = uri.getQueryParameter("t");
+            if (t == null) t = uri.getQueryParameter("text");
+        } catch (RuntimeException ignored) {
+            // 不是层级 URI
+        }
+        if (t == null || t.trim().isEmpty()) {
+            // tangli:同步课表 这种不带 // 的写法：整段当一行指令
+            String ssp = uri.getSchemeSpecificPart();
+            t = ssp == null ? "" : ssp.replaceFirst("^//(cmd/?)?", "");
+        }
+        t = t.trim();
+        if (t.isEmpty()) return "";
+        return TangliCommand.looksLike(t) ? t : TangliCommand.HEADER + " v1\n" + t;
+    }
+
+    /** 点了 tangli:// 链接：直接弹预览（仍需确认）。 */
+    static void openLink(Activity a, android.net.Uri uri, Runnable refresh) {
+        String text = fromLink(uri);
+        if (text.isEmpty()) {
+            Toast.makeText(a, "链接里没有烫梨指令", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        markHandled(a, text);
+        showPreview(a, text, refresh);
+    }
+
+    static TangliCommand.Env envWithSettings(Context ctx) {
+        return env(ctx, TimetableStore.load(ctx));
+    }
+
+    static String exportAllText(Context ctx) {
+        Timetable t = TimetableStore.load(ctx);
+        return TangliCommand.exportAll(t, env(ctx, t));
+    }
+
+    /** 课表 + 临时安排 + 备注 + 设置 + 作息，复制成一段指令（换手机时粘贴就能还原）。 */
+    static void exportAll(Activity a) {
+        String text = exportAllText(a);
+        copy(a, "烫梨指令 · 全部", text);
+        new AlertDialog.Builder(a)
+                .setTitle("已复制全部设置")
+                .setMessage("课表、停课调课、备注、设置和作息都在这段指令里。换手机后在新烫梨里粘贴，就能一次还原。\n\n"
+                        + "注意：它以「整表」开头，粘贴时会先清空那边的课表。")
+                .setPositiveButton("知道了", null)
                 .show();
     }
 
@@ -253,14 +390,52 @@ final class CommandUi {
         }
         String head = c.name + " · 第" + week + "周" + Dates.cnDay(s.dayOfWeek) + " "
                 + (s.hasCustomTime() ? s.timeStart + "-" + s.timeEnd : s.startSection + "-" + s.endSection + "节");
+        boolean hasNote = c.note != null && !c.note.isEmpty();
+        String noteItem = hasNote ? "备注：" + (c.note.length() > 16 ? c.note.substring(0, 16) + "…" : c.note) : "写备注…";
         new AlertDialog.Builder(a)
                 .setTitle(head)
-                .setItems(new String[]{"仅本周停课", "调到其他时间…", "编辑课程"}, (dlg, which) -> {
+                .setItems(new String[]{"仅本周停课", "调到其他时间…", noteItem, "编辑课程"}, (dlg, which) -> {
                     if (which == 0) cancelOnce(a, c, s, week, refresh);
                     else if (which == 1) showMoveDialog(a, c, s, week, refresh);
+                    else if (which == 2) showNoteDialog(a, c, refresh);
                     else editor.open(c, s);
                 })
                 .show();
+    }
+
+    /** 课程备注（作业、带什么、提醒）：同名课程共用一条，课块右上角显示小点。 */
+    static void showNoteDialog(Activity a, Timetable.Course c, Runnable refresh) {
+        float d = a.getResources().getDisplayMetrics().density;
+        EditText et = new EditText(a);
+        et.setHint("比如：周三前交第三章作业");
+        et.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        et.setMinLines(2);
+        et.setTextSize(14f);
+        et.setText(c.note == null ? "" : c.note);
+        et.setSelection(et.getText().length());
+        LinearLayout wrap = new LinearLayout(a);
+        int pad = Math.round(20 * d);
+        wrap.setPadding(pad, Math.round(8 * d), pad, 0);
+        wrap.addView(et, new LinearLayout.LayoutParams(-1, -2));
+        AlertDialog.Builder b = new AlertDialog.Builder(a)
+                .setTitle(c.name + " · 备注")
+                .setView(wrap)
+                .setNegativeButton("取消", null)
+                .setPositiveButton("保存", (dlg, w) -> saveNote(a, c.name, et.getText().toString().trim(), refresh));
+        if (c.note != null && !c.note.isEmpty()) {
+            b.setNeutralButton("清空", (dlg, w) -> saveNote(a, c.name, "", refresh));
+        }
+        b.show();
+    }
+
+    private static void saveNote(Activity a, String name, String note, Runnable refresh) {
+        Timetable t = TimetableStore.load(a);
+        for (Timetable.Course x : t.courses) if (x.name.equals(name)) x.note = note;
+        if (!TimetableStore.save(a, t)) {
+            Toast.makeText(a, "保存失败", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (refresh != null) refresh.run();
     }
 
     private static Timetable.Adjust sourceOf(String type, Timetable.Course c, Timetable.Session s, int week) {

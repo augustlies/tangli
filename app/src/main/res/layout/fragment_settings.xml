@@ -621,6 +621,7 @@
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_seed_demo_all"
+                    android:visibility="gone"
                         style="@style/Gauge.Button.Outline"
                         android:layout_width="0dp"
                         android:layout_height="42dp"
