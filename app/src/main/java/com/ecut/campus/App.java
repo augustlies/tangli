@@ -8,6 +8,7 @@ public class App extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        DiagLog.installCrashHandler(this);
         applyNightMode(Prefs.nightMode(this));
         G.init(this);
         // 冷启动只做必须的事：规则预解析、后台任务登记都放到低优先级线程，

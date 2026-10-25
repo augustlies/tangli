@@ -77,8 +77,66 @@ public final class Timetable {
         public String location = "";     // 教室（每个时段可能不同）
         public String campus = "";       // 校区
         public String roomType = "";     // 场地类别
+        /** 本时段教师；空串表示沿用课程教师。 */
+        public String teacher = "";
+        /** 按周换老师（如形势与政策每周一个主讲）：周次 → 教师，优先于 teacher。 */
+        public java.util.Map<Integer, String> weekTeachers = new java.util.TreeMap<>();
+        /** 自定义起止时间 HH:mm（如考试 14:30–16:30）；都为空时按节次画。 */
+        public String timeStart = "";
+        public String timeEnd = "";
 
         public Session() {}
+
+        /** 有合法的自定义时间（开始早于结束）。 */
+        public boolean hasCustomTime() {
+            int a = minutesOf(timeStart), b = minutesOf(timeEnd);
+            return a >= 0 && b > a;
+        }
+
+        /** 这一周显示哪位老师：按周 > 本时段 > 课程。 */
+        public String teacherFor(int week, String courseTeacher) {
+            String w = weekTeachers.get(week);
+            if (w != null && !w.isEmpty()) return w;
+            if (teacher != null && !teacher.isEmpty()) return teacher;
+            return courseTeacher == null ? "" : courseTeacher;
+        }
+
+        /** "HH:mm" → 当天分钟数；格式不对返回 -1。 */
+        public static int minutesOf(String hm) {
+            if (hm == null) return -1;
+            String s = hm.trim();
+            int c = s.indexOf(':');
+            if (c <= 0) return -1;
+            try {
+                int h = Integer.parseInt(s.substring(0, c));
+                int m = Integer.parseInt(s.substring(c + 1));
+                if (h < 0 || h > 23 || m < 0 || m > 59) return -1;
+                return h * 60 + m;
+            } catch (NumberFormatException e) {
+                return -1;
+            }
+        }
+
+        public static String formatHm(int minutes) {
+            return String.format(java.util.Locale.US, "%02d:%02d", minutes / 60, minutes % 60);
+        }
+
+        public Session copy() {
+            Session s = new Session();
+            s.dayOfWeek = dayOfWeek;
+            s.startSection = startSection;
+            s.endSection = endSection;
+            s.weeks.addAll(weeks);
+            s.weeksRaw = weeksRaw;
+            s.location = location;
+            s.campus = campus;
+            s.roomType = roomType;
+            s.teacher = teacher;
+            s.weekTeachers.putAll(weekTeachers);
+            s.timeStart = timeStart;
+            s.timeEnd = timeEnd;
+            return s;
+        }
 
         public JSONObject toJson() throws JSONException {
             JSONObject o = new JSONObject();
@@ -92,6 +150,18 @@ public final class Timetable {
             o.put("location", location);
             o.put("campus", campus);
             o.put("roomType", roomType);
+            if (teacher != null && !teacher.isEmpty()) o.put("teacher", teacher);
+            if (!weekTeachers.isEmpty()) {
+                JSONObject wt = new JSONObject();
+                for (java.util.Map.Entry<Integer, String> e : weekTeachers.entrySet()) {
+                    wt.put(String.valueOf(e.getKey()), e.getValue());
+                }
+                o.put("weekTeachers", wt);
+            }
+            if (hasCustomTime()) {
+                o.put("timeStart", timeStart);
+                o.put("timeEnd", timeEnd);
+            }
             return o;
         }
 
@@ -111,6 +181,18 @@ public final class Timetable {
             s.location = o.optString("location", "");
             s.campus = o.optString("campus", "");
             s.roomType = o.optString("roomType", "");
+            s.teacher = o.optString("teacher", "");
+            JSONObject wt = o.optJSONObject("weekTeachers");
+            if (wt != null) {
+                java.util.Iterator<String> it = wt.keys();
+                while (it.hasNext()) {
+                    String k = it.next();
+                    try { s.weekTeachers.put(Integer.parseInt(k), wt.optString(k, "")); }
+                    catch (NumberFormatException ignored) {}
+                }
+            }
+            s.timeStart = o.optString("timeStart", "");
+            s.timeEnd = o.optString("timeEnd", "");
             return s;
         }
 

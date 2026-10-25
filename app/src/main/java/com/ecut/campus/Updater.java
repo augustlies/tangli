@@ -29,7 +29,7 @@ public final class Updater {
     public static final String ISSUES_URL = REPO_URL + "/issues/new";
     public static final String FEEDBACK_EMAIL = "sueexin@163.com";
     private static final String API = "https://api.github.com/repos/" + REPO + "/releases/latest";
-    private static final long AUTO_INTERVAL = 24L * 3600 * 1000;
+    private static final long AUTO_INTERVAL = 6L * 60 * 60 * 1000;
 
     public static final class Release {
         public String tag, name, notes, pageUrl, apkUrl;
@@ -87,7 +87,7 @@ public final class Updater {
         return r != null && VersionCompare.isNewer(r.tag, BuildConfig.VERSION_NAME);
     }
 
-    /** 打开 App 时静默检查，一天最多一次；跳过的版本不再提示。 */
+    /** 打开 App 时静默检查，6 小时最多一次；勾了「不再提示」的版本不再弹。 */
     public static void autoCheck(Activity a) {
         if (!Prefs.updateAutoCheck(a)) return;
         long now = System.currentTimeMillis();
@@ -103,16 +103,42 @@ public final class Updater {
     public static void showDialog(Activity a, Release r, boolean allowSkip) {
         String notes = r.notes == null ? "" : r.notes.trim();
         if (notes.length() > 600) notes = notes.substring(0, 600) + "…";
-        MaterialAlertDialogBuilder b = new MaterialAlertDialogBuilder(a)
+        float dp = a.getResources().getDisplayMetrics().density;
+        android.widget.LinearLayout box = new android.widget.LinearLayout(a);
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
+        box.setPadding(Math.round(24 * dp), Math.round(8 * dp), Math.round(24 * dp), 0);
+        android.widget.TextView msg = new android.widget.TextView(a);
+        msg.setText((notes.isEmpty() ? "" : notes + "\n\n") + "当前版本 v" + BuildConfig.VERSION_NAME);
+        msg.setTextSize(14f);
+        msg.setTextColor(G.SUB);
+        msg.setLineSpacing(0f, 1.15f);
+        box.addView(msg);
+        android.widget.CheckBox never = new android.widget.CheckBox(a);
+        never.setText("这个版本不再提示");
+        never.setTextSize(13f);
+        never.setTextColor(G.SUB);
+        if (allowSkip) {
+            android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.topMargin = Math.round(10 * dp);
+            lp.leftMargin = Math.round(-6 * dp);
+            box.addView(never, lp);
+        }
+        android.widget.ScrollView sv = new android.widget.ScrollView(a);
+        sv.addView(box);
+        new MaterialAlertDialogBuilder(a)
                 .setTitle("发现新版本 " + r.tag)
-                .setMessage((notes.isEmpty() ? "" : notes + "\n\n") + "当前版本 v" + BuildConfig.VERSION_NAME)
+                .setView(sv)
                 .setPositiveButton("下载更新", (d, w) -> open(a, r.apkUrl != null && !r.apkUrl.isEmpty()
                         ? r.apkUrl : r.pageUrl))
-                .setNegativeButton("稍后", null);
-        if (allowSkip) {
-            b.setNeutralButton("跳过此版本", (d, w) -> Prefs.setUpdateSkippedTag(a, r.tag));
-        }
-        b.show();
+                .setNegativeButton("关闭", (d, w) -> {
+                    if (allowSkip && never.isChecked()) Prefs.setUpdateSkippedTag(a, r.tag);
+                })
+                .setOnCancelListener(d -> {
+                    if (allowSkip && never.isChecked()) Prefs.setUpdateSkippedTag(a, r.tag);
+                })
+                .show();
     }
 
     public static void open(Context c, String url) {

@@ -39,7 +39,8 @@ public class FreeTimeActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         G.init(this);
         schedule = ScheduleSettingsStore.load(this);
-        myStart = WeekMath.normalizeToMonday(Prefs.semesterStartDate(this));
+        myStart = WeekMath.effectiveStart(Prefs.semesterStartDate(this),
+                TimetableStore.load(this).semester.id);
         week = Prefs.hasCurrentWeek(this) ? Prefs.currentWeek(this)
                 : WeekMath.currentWeek(myStart, WeekMath.openWeekSpan(myStart));
         names.add("我");

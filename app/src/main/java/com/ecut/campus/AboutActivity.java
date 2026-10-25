@@ -59,6 +59,8 @@ public class AboutActivity extends AppCompatActivity {
             cm.setPrimaryClip(ClipData.newPlainText("email", Updater.FEEDBACK_EMAIL));
             Toast.makeText(this, "已复制 " + Updater.FEEDBACK_EMAIL, Toast.LENGTH_SHORT).show();
         });
+        Ui.row(this, c2, "04", "导出诊断日志", "课表不对、同步失败时导出，连同截图一起发来", "EXPORT",
+                v -> DiagLog.export(this));
         TextView tip = Ui.text(this, col,
                 "反馈时说清楚哪个页面、做了什么、看到了什么，最好附一张截图。邮件里会自动带上版本号和机型。",
                 12f, G.MUTE);

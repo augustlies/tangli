@@ -81,6 +81,13 @@ public final class AcademicCalendar {
         EVENTS.add(new Event(s, e, label, holiday));
     }
 
+    /** 按学期 id（如 2026-2027-1）找内置校历；没有返回 null。 */
+    public static Term termById(String id) {
+        if (id == null || id.isEmpty()) return null;
+        for (Term t : TERMS) if (t.id.equals(id)) return t;
+        return null;
+    }
+
     /** 今天所在（或即将开始）的学期：考试结束 + 假期内仍算这个学期；都过了返回 null。 */
     public static Term termFor(String ymd) {
         Term prev = null;

@@ -48,11 +48,12 @@ public final class IcsExporter {
                     day.add(Calendar.DAY_OF_YEAR, (week - 1) * 7 + (s.dayOfWeek - 1));
                     String ymd = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(day.getTime());
 
-                    int pairStart = Math.max(1, Math.min(ScheduleSettings.SECTION_COUNT, s.startSection));
-                    if (pairStart % 2 == 0) pairStart -= 1;
-                    int pairEnd = Math.min(ScheduleSettings.SECTION_COUNT, pairStart + 1);
-                    int startMinutes = sched.startMinutes(pairStart);
-                    int endMinutes = sched.endMinutes(pairEnd);
+                    int secStart = Math.max(1, Math.min(ScheduleSettings.SECTION_COUNT, s.startSection));
+                    int secEnd = Math.max(secStart, Math.min(ScheduleSettings.SECTION_COUNT, s.endSection));
+                    int startMinutes = s.hasCustomTime()
+                            ? Timetable.Session.minutesOf(s.timeStart) : sched.startMinutes(secStart);
+                    int endMinutes = s.hasCustomTime()
+                            ? Timetable.Session.minutesOf(s.timeEnd) : sched.endMinutes(secEnd);
 
                     String dtStart = ymd.replace("-", "") + "T"
                             + hm(startMinutes) + "00";
@@ -68,7 +69,7 @@ public final class IcsExporter {
                     sb.append("SUMMARY:").append(escape(c.name)).append("\r\n");
                     String loc = s.location == null ? "" : s.location.trim();
                     if (!loc.isEmpty()) sb.append("LOCATION:").append(escape(loc)).append("\r\n");
-                    String teacher = c.teacher == null ? "" : c.teacher.trim();
+                    String teacher = s.teacherFor(week, c.teacher).trim();
                     if (!teacher.isEmpty()) {
                         sb.append("DESCRIPTION:").append(escape(teacher)).append("\r\n");
                     }

@@ -32,6 +32,7 @@ public final class JwglxtFetcher {
         public int rawRecords;          // kbList 原始条数
         public int courseCount;         // 聚合后的课程数
         public int failedWeekExpr;      // 周次解析失败的条数
+        public int mergedDuplicates;    // 同名同时段被合并的重复时段数
         public List<String> warnings = new ArrayList<>();
 
         public boolean ok() {
@@ -131,6 +132,7 @@ public final class JwglxtFetcher {
             session.location = clean(rec.optString("cdmc", ""));
             session.campus = clean(rec.optString("xqmc", ""));
             session.roomType = clean(rec.optString("kclbmc", ""));
+            session.teacher = teacher;
 
             // 去重：同一课程同一时段可能被重复下发
             if (!containsSession(course, session)) {
@@ -138,7 +140,12 @@ public final class JwglxtFetcher {
             }
         }
 
-        r.timetable.courses.addAll(grouped.values());
+        List<Timetable.Course> courses = new ArrayList<>(grouped.values());
+        r.mergedDuplicates = mergeOverlaps(courses);
+        if (r.mergedDuplicates > 0) {
+            r.warnings.add("合并了 " + r.mergedDuplicates + " 个同名同时段的重复时段");
+        }
+        r.timetable.courses.addAll(courses);
         CourseColorAssigner.assign(r.timetable);
         r.courseCount = r.timetable.courses.size();
         return r;
@@ -218,6 +225,86 @@ public final class JwglxtFetcher {
             default:   term = 1; break;
         }
         return year + "-" + term;
+    }
+
+    /**
+     * 教务偶尔把同一门课在同一时段下发成两条（不同 jxb_id、或同一教学班周次写法不同），
+     * 例如「形势与政策」按专题拆成多个教学班。课表上它们是同一节课，不应排成两列冲突。
+     * 规则：课程名相同 + 星期相同 + 节次相同 + 周次有交集 → 并成一个时段（周次取并集，
+     * 教师/教室不同时拼在一起）。不同名的课真冲突时照常并排显示。
+     *
+     * @return 被合并掉的时段数
+     */
+    static int mergeOverlaps(List<Timetable.Course> courses) {
+        int merged = 0;
+        for (int i = 0; i < courses.size(); i++) {
+            Timetable.Course a = courses.get(i);
+            for (int j = i; j < courses.size(); j++) {
+                Timetable.Course b = courses.get(j);
+                if (!a.name.equals(b.name)) continue;
+                for (int si = 0; si < a.sessions.size(); si++) {
+                    Timetable.Session x = a.sessions.get(si);
+                    int start = (a == b) ? si + 1 : 0;
+                    for (int sj = start; sj < b.sessions.size(); sj++) {
+                        Timetable.Session y = b.sessions.get(sj);
+                        if (x.dayOfWeek != y.dayOfWeek || x.startSection != y.startSection
+                                || x.endSection != y.endSection || !intersects(x.weeks, y.weeks)) continue;
+                        mergeTeachers(x, y, a.teacher, b.teacher);
+                        boolean added = false;
+                        for (Integer w : y.weeks) if (!x.weeks.contains(w)) { x.weeks.add(w); added = true; }
+                        java.util.Collections.sort(x.weeks);
+                        if (added && !y.weeksRaw.isEmpty() && !x.weeksRaw.equals(y.weeksRaw)) {
+                            x.weeksRaw = x.weeksRaw.isEmpty() ? y.weeksRaw : x.weeksRaw + "," + y.weeksRaw;
+                        }
+                        x.location = joinDistinct(x.location, y.location, " / ");
+                        b.sessions.remove(sj);
+                        sj--;
+                        merged++;
+                    }
+                }
+            }
+        }
+        for (int i = courses.size() - 1; i >= 0; i--) {
+            if (courses.get(i).sessions.isEmpty()) courses.remove(i);
+        }
+        return merged;
+    }
+
+    /**
+     * 合并两条记录的教师：周次范围更窄的那条更具体（如「第11周 刘锦春」比「11-14周 夏菲」具体），
+     * 它覆盖的周记到 weekTeachers 里；宽的那条作为本时段默认教师。
+     */
+    private static void mergeTeachers(Timetable.Session x, Timetable.Session y,
+                                      String courseTeacherX, String courseTeacherY) {
+        String tx = x.teacher.isEmpty() ? courseTeacherX : x.teacher;
+        String ty = y.teacher.isEmpty() ? courseTeacherY : y.teacher;
+        if (ty == null || ty.isEmpty() || ty.equals(tx)) {
+            for (java.util.Map.Entry<Integer, String> e : y.weekTeachers.entrySet()) {
+                x.weekTeachers.putIfAbsent(e.getKey(), e.getValue());
+            }
+            return;
+        }
+        if (y.weeks.size() <= x.weeks.size() || x.weeks.isEmpty()) {
+            for (Integer w : y.weeks) x.weekTeachers.put(w, ty);
+        } else {
+            for (Integer w : x.weeks) x.weekTeachers.putIfAbsent(w, tx);
+            x.teacher = ty;
+        }
+        for (java.util.Map.Entry<Integer, String> e : y.weekTeachers.entrySet()) {
+            x.weekTeachers.put(e.getKey(), e.getValue());
+        }
+    }
+
+    private static boolean intersects(List<Integer> a, List<Integer> b) {
+        for (Integer w : a) if (b.contains(w)) return true;
+        return false;
+    }
+
+    private static String joinDistinct(String a, String b, String sep) {
+        if (b == null || b.isEmpty()) return a == null ? "" : a;
+        if (a == null || a.isEmpty()) return b;
+        for (String p : a.split(java.util.regex.Pattern.quote(sep))) if (p.equals(b)) return a;
+        return a + sep + b;
     }
 
     private static boolean containsSession(Timetable.Course c, Timetable.Session s) {

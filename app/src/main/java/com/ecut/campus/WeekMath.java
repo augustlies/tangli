@@ -1,5 +1,6 @@
 package com.ecut.campus;
 
+import com.ecut.campus.data.AcademicCalendar;
 import com.ecut.campus.data.Timetable;
 import com.ecut.campus.data.SemesterMetaPolicy;
 
@@ -53,6 +54,21 @@ public final class WeekMath {
         if (days < 0) return 1;
         int week = (int) Math.floorDiv(days, 7L) + 1;
         return Math.max(1, Math.min(total, week));
+    }
+
+    /**
+     * 实际用于算周次和日期的第 1 周周一。
+     * 用户没手动设开学日期时（新用户同步完就是这样），按内置校历兜底：
+     * 先按学期 id 找，学期 id 未知时取今天所在学期。都找不到返回空串。
+     */
+    public static String effectiveStart(String startDate, String semesterId) {
+        String s = normalizeToMonday(startDate);
+        if (!s.isEmpty()) return s;
+        AcademicCalendar.Term t = AcademicCalendar.termById(semesterId);
+        if (t == null && (semesterId == null || semesterId.isEmpty())) {
+            t = AcademicCalendar.termFor(todayDateLabel());
+        }
+        return t != null ? t.classStart : "";
     }
 
     /** 任意日期落在第几周（周一为一周起点；解析失败返回 -1，可能越界由调用方收敛）。 */
