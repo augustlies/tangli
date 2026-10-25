@@ -268,8 +268,87 @@ public final class Timetable {
         }
     }
 
+    /**
+     * 单次调整（不改课程本身）：
+     *   cancel  某周某天某节停一次课（start=0 表示那天这门课全停）
+     *   move    把某次课调到另一周/天/节（或自定义时间），原位置显示「已调走」
+     *   off     某天放假（date），当天课程置灰
+     *   makeup  某天补课（date），上 fromDate 那天的课
+     */
+    public static final class Adjust {
+        public static final String CANCEL = "cancel";
+        public static final String MOVE = "move";
+        public static final String OFF = "off";
+        public static final String MAKEUP = "makeup";
+
+        public String id = "";
+        public String type = CANCEL;
+        public String name = "";        // 课程名（cancel/move）
+        public int week, day, start, end;
+        public int toWeek, toDay, toStart, toEnd;
+        public String toTimeStart = "", toTimeEnd = "", toLocation = "";
+        public String date = "";        // off/makeup：yyyy-MM-dd
+        public String fromDate = "";    // makeup：上哪天的课
+        public String note = "";
+
+        public boolean hasToTime() {
+            int a = Session.minutesOf(toTimeStart), b = Session.minutesOf(toTimeEnd);
+            return a >= 0 && b > a;
+        }
+
+        /** 是否同一件事（去重用，忽略 id/note）。 */
+        public boolean sameAs(Adjust o) {
+            return type.equals(o.type) && name.equals(o.name) && week == o.week && day == o.day
+                    && start == o.start && end == o.end && toWeek == o.toWeek && toDay == o.toDay
+                    && toStart == o.toStart && toEnd == o.toEnd && toTimeStart.equals(o.toTimeStart)
+                    && toTimeEnd.equals(o.toTimeEnd) && date.equals(o.date) && fromDate.equals(o.fromDate);
+        }
+
+        public JSONObject toJson() throws JSONException {
+            JSONObject o = new JSONObject();
+            o.put("id", id);
+            o.put("type", type);
+            if (!name.isEmpty()) o.put("name", name);
+            if (week != 0) o.put("week", week);
+            if (day != 0) o.put("day", day);
+            if (start != 0) o.put("start", start);
+            if (end != 0) o.put("end", end);
+            if (toWeek != 0) o.put("toWeek", toWeek);
+            if (toDay != 0) o.put("toDay", toDay);
+            if (toStart != 0) o.put("toStart", toStart);
+            if (toEnd != 0) o.put("toEnd", toEnd);
+            if (!toTimeStart.isEmpty()) o.put("toTimeStart", toTimeStart);
+            if (!toTimeEnd.isEmpty()) o.put("toTimeEnd", toTimeEnd);
+            if (!toLocation.isEmpty()) o.put("toLocation", toLocation);
+            if (!date.isEmpty()) o.put("date", date);
+            if (!fromDate.isEmpty()) o.put("fromDate", fromDate);
+            if (!note.isEmpty()) o.put("note", note);
+            return o;
+        }
+
+        public static Adjust fromJson(JSONObject o) {
+            Adjust a = new Adjust();
+            a.id = o.optString("id", "");
+            a.type = o.optString("type", CANCEL);
+            a.name = o.optString("name", "");
+            a.week = o.optInt("week"); a.day = o.optInt("day");
+            a.start = o.optInt("start"); a.end = o.optInt("end");
+            a.toWeek = o.optInt("toWeek"); a.toDay = o.optInt("toDay");
+            a.toStart = o.optInt("toStart"); a.toEnd = o.optInt("toEnd");
+            a.toTimeStart = o.optString("toTimeStart", "");
+            a.toTimeEnd = o.optString("toTimeEnd", "");
+            a.toLocation = o.optString("toLocation", "");
+            a.date = o.optString("date", "");
+            a.fromDate = o.optString("fromDate", "");
+            a.note = o.optString("note", "");
+            return a;
+        }
+    }
+
     public Semester semester = new Semester();
     public List<Course> courses = new ArrayList<>();
+    /** 停课/调课/放假/补课，跟着学期走，同步教务时保留。 */
+    public List<Adjust> adjusts = new ArrayList<>();
 
     public Timetable() {}
 
@@ -280,6 +359,11 @@ public final class Timetable {
         JSONArray ca = new JSONArray();
         for (Course c : courses) ca.put(c.toJson());
         o.put("courses", ca);
+        if (!adjusts.isEmpty()) {
+            JSONArray aa = new JSONArray();
+            for (Adjust a : adjusts) aa.put(a.toJson());
+            o.put("adjusts", aa);
+        }
         return o;
     }
 
@@ -296,6 +380,13 @@ public final class Timetable {
             for (int i = 0; i < ca.length(); i++) {
                 JSONObject co = ca.optJSONObject(i);
                 if (co != null) t.courses.add(Course.fromJson(co));
+            }
+        }
+        JSONArray aa = o.optJSONArray("adjusts");
+        if (aa != null) {
+            for (int i = 0; i < aa.length(); i++) {
+                JSONObject ao = aa.optJSONObject(i);
+                if (ao != null) t.adjusts.add(Adjust.fromJson(ao));
             }
         }
         return t;

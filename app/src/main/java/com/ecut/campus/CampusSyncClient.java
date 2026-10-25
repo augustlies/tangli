@@ -20,6 +20,7 @@ import com.ecut.campus.data.JwglxtFetcher;
 import com.ecut.campus.data.SemesterArchive;
 import com.ecut.campus.data.Timetable;
 import com.ecut.campus.data.TimetableStore;
+import com.ecut.campus.data.SyncDiff;
 
 import org.json.JSONTokener;
 
@@ -49,6 +50,9 @@ public final class CampusSyncClient {
             this.label = label;
         }
     }
+
+    /** 最近一次当前学期课表同步的变化摘要（UI 取走后清空）。 */
+    public static volatile String lastTimetableDiff = "";
 
     public interface Callback {
         void onSuccess(int count);
@@ -410,8 +414,9 @@ public final class CampusSyncClient {
                     return;
                 }
             } else {
-                merged = TimetableStore.merge(
-                        TimetableStore.load(appContext), result.timetable);
+                Timetable before = TimetableStore.load(appContext);
+                merged = TimetableStore.merge(before, result.timetable);
+                lastTimetableDiff = SyncDiff.summarize(before, merged);
                 if (!TimetableStore.save(appContext, merged)) {
                     fail("课表写入本地失败");
                     return;
