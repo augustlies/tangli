@@ -267,4 +267,86 @@ public class JwglxtFetcherTest {
         assertEquals("2026-2027-2", JwglxtFetcher.buildSemesterId("2026", "12"));
         assertEquals("2025-2026-1", JwglxtFetcher.buildSemesterId("2025", "3"));
     }
+
+    // ---------- 同名同时段去重（形势与政策被拆成多个教学班） ----------
+
+    @Test
+    public void parse_sameNameSameSlot_mergedIntoOneSession() {
+        String json = "{\"xsxx\":{\"XNM\":\"2026\",\"XQM\":\"3\"},\"kbList\":["
+                + rec("形势与政策(III)", "1", "3-4", "11周", "3-402", "教师A", "0.5", "JXB_A")
+                + "," + rec("形势与政策(III)", "1", "3-4", "11-12周", "3-402", "教师B", "0.5", "JXB_B")
+                + "," + rec("马克思主义基本原理", "1", "3-4", "1-10周", "3-104", "教师C", "3", "JXB_C")
+                + "]}";
+        JwglxtFetcher.Result r = JwglxtFetcher.parse(json);
+        assertEquals(1, r.mergedDuplicates);
+        int xs = 0;
+        for (Timetable.Course c : r.timetable.courses) {
+            if (!c.name.startsWith("形势与政策")) continue;
+            xs++;
+            assertEquals(1, c.sessions.size());
+            assertTrue(c.sessions.get(0).weeks.contains(11));
+            assertTrue(c.sessions.get(0).weeks.contains(12));
+            // 窄的（只第 11 周）那条更具体：第 11 周显示教师A，第 12 周显示教师B
+            assertEquals("教师A", c.sessions.get(0).teacherFor(11, c.teacher));
+            assertEquals("教师B", c.sessions.get(0).teacherFor(12, c.teacher));
+            assertEquals("3-402", c.sessions.get(0).location);
+        }
+        assertEquals(1, xs);
+        // 第 11 周周一 3-4 节只剩一门课
+        assertEquals(1, r.timetable.coursesOn(1, 11).size());
+    }
+
+    @Test
+    public void parse_differentNamesSameSlot_keptAsConflict() {
+        String json = "{\"xsxx\":{\"XNM\":\"2026\",\"XQM\":\"3\"},\"kbList\":["
+                + rec("课程甲", "2", "1-2", "1-8周", "1-101", "教师A", "2", "J1")
+                + "," + rec("课程乙", "2", "1-2", "5-8周", "1-102", "教师B", "2", "J2")
+                + "]}";
+        JwglxtFetcher.Result r = JwglxtFetcher.parse(json);
+        assertEquals(0, r.mergedDuplicates);
+        assertEquals(2, r.timetable.courses.size());
+    }
+
+    /** 形势与政策场景：同一教学班，按周换主讲老师。 */
+    @Test
+    public void parse_perWeekLecturers() {
+        String json = "{\"xsxx\":{\"XNM\":\"2026\",\"XQM\":\"3\"},\"kbList\":["
+                + rec("形势与政策（III）", "1", "3-4", "11-14周", "3-402", "教师甲", "0.5", "J")
+                + "," + rec("形势与政策（III）", "1", "3-4", "第11周", "3-402", "教师乙", "0.5", "J")
+                + "," + rec("形势与政策（III）", "1", "3-4", "第12周", "3-402", "教师丙", "0.5", "J")
+                + "," + rec("形势与政策（III）", "1", "3-4", "第13周", "3-402", "教师丁", "0.5", "J")
+                + "," + rec("形势与政策（III）", "1", "3-4", "第14周", "3-402", "教师戊", "0.5", "J")
+                + "]}";
+        JwglxtFetcher.Result r = JwglxtFetcher.parse(json);
+        assertEquals(1, r.timetable.courses.size());
+        Timetable.Course c = r.timetable.courses.get(0);
+        assertEquals(1, c.sessions.size());
+        Timetable.Session s = c.sessions.get(0);
+        assertEquals("11-14周", s.weeksRaw);
+        assertEquals("教师乙", s.teacherFor(11, c.teacher));
+        assertEquals("教师丙", s.teacherFor(12, c.teacher));
+        assertEquals("教师丁", s.teacherFor(13, c.teacher));
+        assertEquals("教师戊", s.teacherFor(14, c.teacher));
+    }
+
+    @Test
+    public void session_customTimeAndWeekTeachers_roundTrip() throws Exception {
+        Timetable.Session s = new Timetable.Session();
+        s.dayOfWeek = 3;
+        s.startSection = 5;
+        s.endSection = 6;
+        s.timeStart = "14:30";
+        s.timeEnd = "16:30";
+        s.weekTeachers.put(11, "教师乙");
+        Timetable.Session back = Timetable.Session.fromJson(s.toJson());
+        assertTrue(back.hasCustomTime());
+        assertEquals("14:30", back.timeStart);
+        assertEquals("16:30", back.timeEnd);
+        assertEquals("教师乙", back.teacherFor(11, "x"));
+        assertEquals("x", back.teacherFor(12, "x"));
+        Timetable.Session bad = new Timetable.Session();
+        bad.timeStart = "16:00";
+        bad.timeEnd = "15:00";
+        assertFalse(bad.hasCustomTime());
+    }
 }

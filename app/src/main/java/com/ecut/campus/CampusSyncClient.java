@@ -342,6 +342,7 @@ public final class CampusSyncClient {
         pollAttempts = 0;
         ehallLoginChecks = 0;
         Log.i(TAG, kind.label + " fallback: " + reason);
+        DiagLog.log(appContext, "sync", kind.label + " fallback: " + reason);
         webView.stopLoading();
         webView.loadUrl(EHALL_PROXY_HOME);
         handler.postDelayed(poll, 1_500L);
@@ -388,6 +389,11 @@ public final class CampusSyncClient {
                 return;
             }
             JwglxtFetcher.Result result = JwglxtFetcher.parse(json);
+            DiagLog.saveKbList(appContext, json);
+            DiagLog.log(appContext, "sync", "课表解析: 学期=" + result.timetable.semester.id
+                    + " 原始=" + result.rawRecords + " 课程=" + result.courseCount
+                    + " 周次失败=" + result.failedWeekExpr + " 合并重复=" + result.mergedDuplicates
+                    + (result.warnings.isEmpty() ? "" : " " + result.warnings));
             if (!result.ok()) {
                 fail("课表解析为空，请稍后重试");
                 return;
@@ -633,6 +639,7 @@ public final class CampusSyncClient {
         finished = true;
         running = false;
         Log.w(TAG, kind.label + " failed: " + message);
+        DiagLog.log(appContext, "sync", kind.label + " 失败: " + message);
         if (message != null && message.contains("登录已失效")) Prefs.setSessionExpired(appContext, true);
         cleanup();
         callback.onFailure(message);

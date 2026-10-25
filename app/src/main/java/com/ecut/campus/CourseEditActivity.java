@@ -39,7 +39,6 @@ public class CourseEditActivity extends AppCompatActivity {
     public static final String EXTRA_DEFAULT_SECTION = "default_section";
     public static final String EXTRA_CURRENT_WEEK = "current_week";
 
-    private static final int[] PAIR_STARTS = {1, 3, 5, 7, 9};
     private static final String[] DAY_LABELS = {"一", "二", "三", "四", "五", "六", "日"};
     private static final String[] WEEK_MODE_LABELS = {"全部周", "连续", "单周", "双周", "离散"};
 
@@ -63,7 +62,12 @@ public class CourseEditActivity extends AppCompatActivity {
     private LinearLayout weekChipContainer;
 
     private int selectedDay = 1;
-    private int selectedPairStart = 1;
+    private int selectedStart = 1;
+    private int selectedEnd = 2;
+    private boolean customTime = false;
+    private String timeStart = "";
+    private String timeEnd = "";
+    private ScheduleSettings sched;
     private int selectedColor = 0;
     private int weekMode = 0;
     private Integer continuousStart = null;
@@ -116,6 +120,11 @@ public class CourseEditActivity extends AppCompatActivity {
         sessionChipRow = findViewById(R.id.session_chip_container);
         daySelectorRow = findViewById(R.id.day_selector_row);
         sectionSelectorRow = findViewById(R.id.section_selector_row);
+        sectionSelectorRow.setOrientation(LinearLayout.VERTICAL);
+        android.view.ViewGroup.LayoutParams slp = sectionSelectorRow.getLayoutParams();
+        slp.height = android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
+        sectionSelectorRow.setLayoutParams(slp);
+        sched = ScheduleSettingsStore.load(this);
         weekModeRow = findViewById(R.id.week_mode_row);
         weekChipContainer = findViewById(R.id.week_chip_container);
 
@@ -155,8 +164,9 @@ public class CourseEditActivity extends AppCompatActivity {
             Timetable.Session s = new Timetable.Session();
             s.dayOfWeek = getIntent().getIntExtra(EXTRA_DEFAULT_DAY, WeekMath.todayDayOfWeek());
             int defStart = getIntent().getIntExtra(EXTRA_DEFAULT_SECTION, 1);
-            s.startSection = pairStart(defStart);
-            s.endSection = Math.min(10, s.startSection + 1);
+            s.startSection = clamp(defStart, 1, 10);
+            // 点在单数节默认两节，点在双数节默认只占这一节；编辑页里可以逐节加减
+            s.endSection = (s.startSection % 2 == 1) ? Math.min(10, s.startSection + 1) : s.startSection;
             s.weeks.add(currentWeek);
             s.weeksRaw = String.valueOf(currentWeek);
             draftSessions.add(s);
@@ -207,7 +217,9 @@ public class CourseEditActivity extends AppCompatActivity {
             Timetable.Session s = draftSessions.get(i);
             TextView chip = new TextView(this);
             chip.setText("周" + DAY_LABELS[clamp(s.dayOfWeek, 1, 7) - 1]
-                    + " " + s.startSection + "-" + s.endSection);
+                    + " " + (s.hasCustomTime() ? s.timeStart
+                    : (s.startSection == s.endSection ? s.startSection + "节"
+                    : s.startSection + "-" + s.endSection)));
             chip.setTextSize(12.5f);
             chip.setTypeface(Typeface.DEFAULT_BOLD);
             chip.setPadding(dp(12), dp(8), dp(12), dp(8));
@@ -234,7 +246,11 @@ public class CourseEditActivity extends AppCompatActivity {
         Timetable.Session s = currentSession();
         loadingForm = true;
         selectedDay = clamp(s.dayOfWeek, 1, 7);
-        selectedPairStart = pairStart(s.startSection);
+        selectedStart = clamp(s.startSection, 1, 10);
+        selectedEnd = clamp(Math.max(s.startSection, s.endSection), selectedStart, 10);
+        customTime = s.hasCustomTime();
+        timeStart = customTime ? s.timeStart : "";
+        timeEnd = customTime ? s.timeEnd : "";
         etLocation.setText(s.location);
         weekMode = detectWeekMode(s);
         selectedWeeks.clear();
@@ -269,17 +285,151 @@ public class CourseEditActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * 节次选择：「按节次」可逐节加减（单节、三节都行）；
+     * 「自定义时间」按真实起止时间画（比如考试 14:30–16:30），不用对齐节次。
+     */
     private void renderSectionSelector() {
         sectionSelectorRow.removeAllViews();
-        for (int start : PAIR_STARTS) {
-            final int pairStart = start;
-            TextView tv = segment(start + "-" + (start + 1), selectedPairStart == start);
-            tv.setOnClickListener(v -> {
-                selectedPairStart = pairStart;
+
+        LinearLayout mode = hRow();
+        TextView bySection = segment("按节次", !customTime);
+        bySection.setOnClickListener(v -> { customTime = false; dirty = true; renderSectionSelector(); });
+        TextView byTime = segment("自定义时间", customTime);
+        byTime.setOnClickListener(v -> {
+            if (!customTime) {
+                customTime = true;
+                if (Timetable.Session.minutesOf(timeStart) < 0) timeStart = sched.startTime(selectedStart);
+                if (Timetable.Session.minutesOf(timeEnd) < 0) timeEnd = sched.endTime(selectedEnd);
                 dirty = true;
                 renderSectionSelector();
-            });
-            sectionSelectorRow.addView(tv);
+            }
+        });
+        mode.addView(bySection);
+        mode.addView(byTime);
+        sectionSelectorRow.addView(mode);
+
+        LinearLayout row = hRow();
+        ((LinearLayout.LayoutParams) row.getLayoutParams()).topMargin = dp(6);
+        if (!customTime) {
+            row.addView(stepper("从第 " + selectedStart + " 节", () -> {
+                if (selectedStart > 1) selectedStart--;
+            }, () -> {
+                if (selectedStart < 10) selectedStart++;
+                if (selectedEnd < selectedStart) selectedEnd = selectedStart;
+            }));
+            row.addView(stepper("到第 " + selectedEnd + " 节", () -> {
+                if (selectedEnd > selectedStart) selectedEnd--;
+            }, () -> {
+                if (selectedEnd < 10) selectedEnd++;
+            }));
+        } else {
+            TextView a = segment("开始 " + timeStart, false);
+            a.setOnClickListener(v -> pickTime(true));
+            TextView b = segment("结束 " + timeEnd, false);
+            b.setOnClickListener(v -> pickTime(false));
+            row.addView(a);
+            row.addView(b);
+        }
+        sectionSelectorRow.addView(row);
+
+        TextView hint = new TextView(this);
+        hint.setTextSize(11.5f);
+        hint.setTextColor(G.MUTE);
+        hint.setPadding(dp(2), dp(6), 0, 0);
+        hint.setText(customTime
+                ? "按真实时间显示在课表上，不用和其他课对齐（适合考试、讲座）"
+                : sched.startTime(selectedStart) + " – " + sched.endTime(selectedEnd)
+                        + " · 共 " + (selectedEnd - selectedStart + 1) + " 节");
+        sectionSelectorRow.addView(hint);
+    }
+
+    private LinearLayout hRow() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(36)));
+        return row;
+    }
+
+    /** [−] 文字 [+]，占半行。 */
+    private View stepper(String label, Runnable minus, Runnable plus) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(36), 1f);
+        lp.setMarginEnd(dp(4));
+        box.setLayoutParams(lp);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(dp(4));
+        bg.setColor(G.PAPER);
+        box.setBackground(bg);
+
+        TextView m = stepBtn("−", minus);
+        TextView t = new TextView(this);
+        t.setText(label);
+        t.setGravity(Gravity.CENTER);
+        t.setTextSize(12.5f);
+        t.setTypeface(Typeface.DEFAULT_BOLD);
+        t.setTextColor(G.INK);
+        t.setLayoutParams(new LinearLayout.LayoutParams(0, dp(36), 1f));
+        TextView p = stepBtn("+", plus);
+        box.addView(m);
+        box.addView(t);
+        box.addView(p);
+        return box;
+    }
+
+    private TextView stepBtn(String s, Runnable action) {
+        TextView b = new TextView(this);
+        b.setText(s);
+        b.setGravity(Gravity.CENTER);
+        b.setTextSize(16f);
+        b.setTextColor(G.INK);
+        b.setLayoutParams(new LinearLayout.LayoutParams(dp(36), dp(36)));
+        b.setOnClickListener(v -> {
+            action.run();
+            dirty = true;
+            renderSectionSelector();
+        });
+        return b;
+    }
+
+    private void pickTime(boolean start) {
+        int cur = Timetable.Session.minutesOf(start ? timeStart : timeEnd);
+        if (cur < 0) cur = 8 * 60;
+        new android.app.TimePickerDialog(this, (view, h, m) -> {
+            String v = Timetable.Session.formatHm(h * 60 + m);
+            if (start) timeStart = v; else timeEnd = v;
+            if (Timetable.Session.minutesOf(timeEnd) <= Timetable.Session.minutesOf(timeStart)) {
+                Toast.makeText(this, "结束时间要晚于开始时间", Toast.LENGTH_SHORT).show();
+            }
+            dirty = true;
+            renderSectionSelector();
+        }, cur / 60, cur % 60, true).show();
+    }
+
+    /** 写入节次/时间。自定义时间同时换算出覆盖的节次，给空闲时间、分享等按节计算的功能用。 */
+    private void applySectionsTo(Timetable.Session s) {
+        if (customTime && Timetable.Session.minutesOf(timeStart) >= 0
+                && Timetable.Session.minutesOf(timeEnd) > Timetable.Session.minutesOf(timeStart)) {
+            int a = Timetable.Session.minutesOf(timeStart), b = Timetable.Session.minutesOf(timeEnd);
+            int first = 10, last = 1;
+            for (int sec = 1; sec <= 10; sec++) {
+                if (sched.endMinutes(sec) > a && sched.startMinutes(sec) < b) {
+                    first = Math.min(first, sec);
+                    last = Math.max(last, sec);
+                }
+            }
+            if (first > last) { first = selectedStart; last = selectedEnd; }
+            s.startSection = first;
+            s.endSection = last;
+            s.timeStart = timeStart;
+            s.timeEnd = timeEnd;
+        } else {
+            s.startSection = selectedStart;
+            s.endSection = Math.max(selectedStart, selectedEnd);
+            s.timeStart = "";
+            s.timeEnd = "";
         }
     }
 
@@ -462,8 +612,7 @@ public class CourseEditActivity extends AppCompatActivity {
         saveFormIntoSession();
         Timetable.Session s = new Timetable.Session();
         s.dayOfWeek = selectedDay;
-        s.startSection = selectedPairStart;
-        s.endSection = Math.min(10, selectedPairStart + 1);
+        applySectionsTo(s);
         s.weeks.add(currentWeek);
         s.weeksRaw = String.valueOf(currentWeek);
         draftSessions.add(s);
@@ -489,8 +638,7 @@ public class CourseEditActivity extends AppCompatActivity {
         if (draftSessions.isEmpty()) return;
         Timetable.Session s = currentSession();
         s.dayOfWeek = selectedDay;
-        s.startSection = selectedPairStart;
-        s.endSection = Math.min(10, selectedPairStart + 1);
+        applySectionsTo(s);
         s.location = etLocation.getText().toString().trim();
         List<Integer> sorted = new ArrayList<>(selectedWeeks);
         sorted.sort(Integer::compareTo);
@@ -582,21 +730,7 @@ public class CourseEditActivity extends AppCompatActivity {
     }
 
     private static Timetable.Session copySession(Timetable.Session src) {
-        Timetable.Session s = new Timetable.Session();
-        s.dayOfWeek = src.dayOfWeek;
-        s.startSection = src.startSection;
-        s.endSection = src.endSection;
-        s.weeks.addAll(src.weeks);
-        s.weeksRaw = src.weeksRaw;
-        s.location = src.location;
-        s.campus = src.campus;
-        s.roomType = src.roomType;
-        return s;
-    }
-
-    private static int pairStart(int section) {
-        int s = clamp(section, 1, 10);
-        return (s % 2 == 1) ? s : s - 1;
+        return src.copy();
     }
 
     private static int clamp(int v, int min, int max) {

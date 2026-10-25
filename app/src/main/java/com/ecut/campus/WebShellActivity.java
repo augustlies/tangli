@@ -429,6 +429,11 @@ public class WebShellActivity extends AppCompatActivity {
             String json = unwrapJsString(raw);
             if (json == null || json.isEmpty()) return;
             JwglxtFetcher.Result res = JwglxtFetcher.parse(json);
+            DiagLog.saveKbList(WebShellActivity.this, json);
+            DiagLog.log(WebShellActivity.this, "webshell", "课表解析: 学期=" + res.timetable.semester.id
+                    + " 原始=" + res.rawRecords + " 课程=" + res.courseCount
+                    + " 合并重复=" + res.mergedDuplicates
+                    + (res.warnings.isEmpty() ? "" : " " + res.warnings));
             if (res.ok()) {
                 Timetable local = TimetableStore.load(WebShellActivity.this);
                 Timetable merged = TimetableStore.merge(local, res.timetable);
