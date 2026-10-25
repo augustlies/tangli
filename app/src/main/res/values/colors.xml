@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#ECEAE4</color>
+    <!-- Gauge 纸墨色板（浅色）。深色见 values-night/colors.xml -->
+    <color name="g_paper">#F5F4F0</color>
+    <color name="g_card">#FBFAF7</color>
+    <color name="g_ink">#111111</color>
+    <color name="g_sub">#55554F</color>
+    <color name="g_sub2">#45453F</color>
+    <color name="g_mute">#9A9993</color>
+    <color name="g_line">#E9E7E1</color>
+    <color name="g_chip">#ECEAE4</color>
+    <color name="g_accent">#FF4A1C</color>
+    <color name="g_hair">#17000000</color>
+    <color name="g_stroke">#33000000</color>
+    <color name="g_ink_18">#2E111111</color>
+    <color name="g_ink_12">#1F111111</color>
+    <color name="g_ink_08">#14111111</color>
+    <color name="g_paper_e8">#E8F5F4F0</color>
+    <color name="g_paper_c8">#C8F5F4F0</color>
+    <color name="g_on_ink">#FBFAF7</color>
+    <color name="g_warn">#B4540A</color>
+    <color name="g_ok">#2F5D3A</color>
+</resources>

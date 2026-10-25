@@ -1,0 +1,54 @@
+name: School Support
+description: 请求支持其他学校的教务系统
+title: "[School] "
+labels: ["school-support"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提交前请确认 `docs/ROADMAP.md` 中 v2.0.0 的多校兼容计划，目前仅支持正方教务。
+
+        **不要提交真实学号、姓名、Cookie、token。**
+
+  - type: input
+    id: school
+    attributes:
+      label: 学校名称
+    validations:
+      required: true
+
+  - type: dropdown
+    id: system
+    attributes:
+      label: 教务系统类型
+      options:
+        - 正方教务 (jwglxt)
+        - URP 教务
+        - 强智教务
+        - 其他 / 不确定
+    validations:
+      required: true
+
+  - type: textarea
+    id: urls
+    attributes:
+      label: 课表与成绩页 URL 模板
+      description: 脱敏后填写，注意保留 gnmkdm 等必要参数
+      placeholder: |
+        课表: /jwglxt/kbcx/xskbcx_cxXskbcxIndex.html?gnmkdm=XXXX&layout=default
+        成绩: /jwglxt/cjcx/cjcx_cxDgXscj.html?gnmkdm=XXXX&layout=default
+    validations:
+      required: true
+
+  - type: textarea
+    id: html
+    attributes:
+      label: 课表页 HTML 片段（脱敏）
+      description: 用于编写解析器。把姓名、学号替换成占位符
+      render: html
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: 补充说明
+      description: 是否需要 VPN / 内网 / 特殊认证等

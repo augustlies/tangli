@@ -1,0 +1,18 @@
+# 烫梨 baseline profile：安装后由 profileinstaller 交给系统预编译（AOT）。
+# 覆盖冷启动到课表首帧的全部本应用代码，以及 AppCompat / Material 的启动路径。
+HSPLcom/ecut/campus/**->**(**)**
+Lcom/ecut/campus/**;
+HSPLandroidx/appcompat/app/**->**(**)**
+Landroidx/appcompat/app/**;
+HSPLandroidx/appcompat/widget/**->**(**)**
+Landroidx/appcompat/widget/**;
+HSPLandroidx/core/**->**(**)**
+Landroidx/core/**;
+HSPLcom/google/android/material/card/**->**(**)**
+Lcom/google/android/material/card/**;
+HSPLcom/google/android/material/button/**->**(**)**
+Lcom/google/android/material/button/**;
+HSPLcom/google/android/material/color/**->**(**)**
+Lcom/google/android/material/color/**;
+HSPLcom/google/android/material/theme/**->**(**)**
+Lcom/google/android/material/theme/**;

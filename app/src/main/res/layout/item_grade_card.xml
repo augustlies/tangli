@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingVertical="14dp">
+
+        <TextView
+            android:id="@+id/tv_grade_index"
+            android:layout_width="28dp"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:text="01"
+            android:textColor="@color/g_mute"
+            android:textSize="11sp" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_grade_course_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="课程"
+                android:textColor="@color/g_ink"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/tv_grade_course_meta"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:ellipsize="end"
+                android:fontFamily="monospace"
+                android:maxLines="1"
+                android:text=""
+                android:textColor="@color/g_mute"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="56dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:gravity="end"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_grade_score_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:includeFontPadding="false"
+                android:text="92"
+                android:textColor="@color/g_ink"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <!-- 刻度条：发丝轨道 + 墨色读数 -->
+            <FrameLayout
+                android:layout_width="56dp"
+                android:layout_height="2dp"
+                android:layout_marginTop="6dp"
+                android:background="@color/g_hair">
+
+                <View
+                    android:id="@+id/grade_color_bar"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:background="@color/g_ink" />
+            </FrameLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1px"
+        android:background="@color/g_hair" />
+</LinearLayout>

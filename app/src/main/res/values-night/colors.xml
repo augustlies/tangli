@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Gauge 墨纸色板（深色）：墨底、暖灰字，朱砂略提亮 -->
+    <color name="g_paper">#0E0E0D</color>
+    <color name="g_card">#171716</color>
+    <color name="g_ink">#ECEAE4</color>
+    <color name="g_sub">#B3B1AA</color>
+    <color name="g_sub2">#C4C2BB</color>
+    <color name="g_mute">#7C7B75</color>
+    <color name="g_line">#2A2A27</color>
+    <color name="g_chip">#242422</color>
+    <color name="g_accent">#FF5A2E</color>
+    <color name="g_hair">#1FFFFFFF</color>
+    <color name="g_stroke">#3DFFFFFF</color>
+    <color name="g_ink_18">#2EECEAE4</color>
+    <color name="g_ink_12">#1FECEAE4</color>
+    <color name="g_ink_08">#14ECEAE4</color>
+    <color name="g_paper_e8">#E80E0E0D</color>
+    <color name="g_paper_c8">#C80E0E0D</color>
+    <color name="g_on_ink">#111111</color>
+    <color name="g_warn">#E8A15A</color>
+    <color name="g_ok">#8FC49B</color>
+</resources>

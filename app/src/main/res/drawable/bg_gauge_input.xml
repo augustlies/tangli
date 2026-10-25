@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 输入框：无底色，只有一条底部发丝线；聚焦时变为墨色粗线 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <layer-list>
+            <item><shape><solid android:color="#00000000" /></shape></item>
+            <item android:gravity="bottom" android:height="1.5dp">
+                <shape><solid android:color="@color/g_ink" /></shape>
+            </item>
+        </layer-list>
+    </item>
+    <item>
+        <layer-list>
+            <item><shape><solid android:color="#00000000" /></shape></item>
+            <item android:gravity="bottom" android:height="1dp">
+                <shape><solid android:color="@color/g_stroke" /></shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

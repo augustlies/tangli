@@ -1,0 +1,89 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.EcutCampus" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/g_ink</item>
+        <item name="colorOnPrimary">@color/g_on_ink</item>
+        <item name="colorPrimaryContainer">@color/g_chip</item>
+        <item name="colorOnPrimaryContainer">@color/g_ink</item>
+        <item name="colorSecondary">@color/g_sub</item>
+        <item name="colorOnSecondary">@color/g_on_ink</item>
+        <item name="colorSecondaryContainer">@color/g_chip</item>
+        <item name="colorOnSecondaryContainer">@color/g_ink</item>
+        <item name="colorError">@color/g_accent</item>
+        <item name="colorSurface">@color/g_paper</item>
+        <item name="colorOnSurface">@color/g_ink</item>
+        <item name="colorSurfaceVariant">@color/g_line</item>
+        <item name="colorOnSurfaceVariant">@color/g_sub</item>
+        <item name="android:windowBackground">@color/g_paper</item>
+        <item name="android:statusBarColor">@color/g_paper</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">@bool/g_light_bars</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">@bool/g_light_bars</item>
+        <item name="android:navigationBarColor">@color/g_paper</item>
+        <!-- Gauge：统一小圆角 + 发丝线 + 墨色控件 -->
+        <item name="shapeAppearanceSmallComponent">@style/Gauge.Shape.Small</item>
+        <item name="shapeAppearanceMediumComponent">@style/Gauge.Shape.Medium</item>
+        <item name="shapeAppearanceLargeComponent">@style/Gauge.Shape.Medium</item>
+        <item name="alertDialogTheme">@style/Gauge.Dialog</item>
+        <item name="materialAlertDialogTheme">@style/Gauge.Dialog</item>
+        <item name="android:alertDialogTheme">@style/Gauge.Dialog.Framework</item>
+        <item name="materialButtonStyle">@style/Gauge.Button</item>
+        <item name="android:textColorHighlight">#33FF4A1C</item>
+        <item name="android:colorControlActivated">@color/g_ink</item>
+        <item name="colorControlActivated">@color/g_ink</item>
+    </style>
+
+    <style name="Gauge.Shape.Small" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">6dp</item>
+    </style>
+    <style name="Gauge.Shape.Medium" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">8dp</item>
+    </style>
+
+    <!-- 实心墨色按钮 -->
+    <style name="Gauge.Button" parent="Widget.Material3.Button">
+        <item name="backgroundTint">@color/g_ink</item>
+        <item name="android:textColor">@color/g_on_ink</item>
+        <item name="cornerRadius">6dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:letterSpacing">0.02</item>
+    </style>
+    <!-- 纸面描边按钮（替代 Tonal） -->
+    <style name="Gauge.Button.Outline" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:textColor">@color/g_ink</item>
+        <item name="strokeColor">@color/g_stroke</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="cornerRadius">6dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="rippleColor">@color/g_hair</item>
+    </style>
+    <style name="Gauge.Button.Text" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/g_ink</item>
+        <item name="rippleColor">@color/g_hair</item>
+    </style>
+
+    <!-- 弹窗：纸面、8dp、发丝描边，按钮墨色 -->
+    <style name="Gauge.Dialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="android:windowBackground">@drawable/bg_gauge_dialog</item>
+        <item name="colorSurface">@color/g_card</item>
+        <item name="colorPrimary">@color/g_ink</item>
+        <item name="android:textColorPrimary">@color/g_ink</item>
+        <item name="android:textColorSecondary">@color/g_sub</item>
+        <item name="shapeAppearanceOverlay">@style/Gauge.Shape.Medium</item>
+        <item name="shapeAppearance">@style/Gauge.Shape.Medium</item>
+        <item name="buttonBarPositiveButtonStyle">@style/Gauge.Button.Text</item>
+        <item name="buttonBarNegativeButtonStyle">@style/Gauge.Button.Text</item>
+        <item name="buttonBarNeutralButtonStyle">@style/Gauge.Button.Text</item>
+        <item name="android:backgroundDimAmount">0.28</item>
+    </style>
+    <style name="Gauge.Dialog.Framework" parent="android:Theme.Material.Light.Dialog.Alert">
+        <item name="android:windowBackground">@drawable/bg_gauge_dialog</item>
+        <item name="android:colorAccent">@color/g_ink</item>
+        <item name="android:colorPrimary">@color/g_ink</item>
+        <item name="android:textColorPrimary">@color/g_ink</item>
+        <item name="android:textColorSecondary">@color/g_sub</item>
+        <item name="android:backgroundDimAmount">0.28</item>
+    </style>
+</resources>

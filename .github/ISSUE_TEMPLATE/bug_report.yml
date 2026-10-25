@@ -1,0 +1,75 @@
+name: Bug Report
+description: 报告一个 bug
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请尽量提供完整信息，尤其是日志和复现步骤。
+
+  - type: input
+    id: version
+    attributes:
+      label: App 版本
+      description: 设置页底部可以看到，或 APK 文件名
+      placeholder: "0.2.0"
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: 设备与系统
+      placeholder: "例如：小米 14 / Android 15"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: module
+    attributes:
+      label: 出问题的模块
+      options:
+        - 课表
+        - 成绩
+        - 广告拦截
+        - 教务直达
+        - 设置
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开 App
+        2. 点击「我的课表」
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志（可选）
+      description: |
+        ```
+        adb logcat -s WebShell:V DomainRules:V DnsFilter:V AndroidRuntime:E
+        ```
+      render: shell

@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">烫梨</string>
+    <string name="tab_timetable">课表</string>
+    <string name="tab_grades">成绩</string>
+    <string name="tab_adblock">拦截</string>
+    <string name="tab_settings">设置</string>
+    <string name="adblock_on">护盾运行中</string>
+    <string name="adblock_off">护盾已待机</string>
+    <string name="adblock_start">开启拦截</string>
+    <string name="adblock_stop">关闭拦截</string>
+</resources>

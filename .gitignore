@@ -1,0 +1,43 @@
+# ---- Android / Gradle ----
+*.iml
+.gradle/
+build/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# ---- 签名密钥：绝对不进仓库 ----
+*.keystore
+*.jks
+release.keystore
+keystore.properties
+signing.properties
+
+# ---- IDE ----
+.idea/
+*.hprof
+.DS_Store
+Thumbs.db
+
+# ---- 本机调试产物 ----
+*.log
+logcat*.txt
+*-screenshot.png
+webshell_screenshot.png
+ui_*.png
+ecut_logcat*.txt
+
+# ---- 逆向 / 抓包临时目录（不属于本项目） ----
+ShandongSchool/
+dns-test/out/
+
+# ---- 验证产物不进仓库（留在本地）----
+artifacts/
+
+
+webshell_screenshot.png
