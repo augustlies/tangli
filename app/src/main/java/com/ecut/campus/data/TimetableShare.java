@@ -43,6 +43,7 @@ public final class TimetableShare {
                 JSONArray a = new JSONArray();
                 a.put(s.dayOfWeek).put(s.startSection).put(s.endSection)
                         .put(WeekRange.compress(s.weeks)).put(s.location == null ? "" : s.location);
+                if (s.hasCustomTime()) a.put(s.timeStart).put(s.timeEnd); // 1.1.0 起：自定义时间（旧版忽略）
                 ss.put(a);
             }
             co.put("t", ss);
@@ -106,6 +107,8 @@ public final class TimetableShare {
                     WeekRange.Parsed p = WeekRange.parse(s.weeksRaw);
                     s.weeks = p.ok() ? new ArrayList<>(p.weeks) : new ArrayList<>();
                     s.location = x.optString(4, "");
+                    s.timeStart = x.optString(5, "");
+                    s.timeEnd = x.optString(6, "");
                     c.sessions.add(s);
                 }
                 t.courses.add(c);

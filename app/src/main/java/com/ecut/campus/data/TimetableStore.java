@@ -134,6 +134,10 @@ public final class TimetableStore {
             out.semester.totalWeeks = local.semester.totalWeeks;
             out.semester.sortOrder = local.semester.sortOrder;
         }
+        // 停课/调课/放假补课是用户自己的安排，教务不下发，同学期同步时原样保留
+        if (local != null && (sameSemester(local, out) || remote.semester.id.isEmpty())) {
+            out.adjusts.addAll(local.adjusts);
+        }
 
         Map<String, Timetable.Course> localByKey = new LinkedHashMap<>();
         if (local != null) {
