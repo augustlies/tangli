@@ -98,6 +98,19 @@ public final class ScheduleSettings {
         return formatHm(endMinutes(sectionNumber));
     }
 
+    /** 按每节起止（分钟，下标 = 节次）回写成「第 1 节开始 + 时长 + 课间」。 */
+    public void applyRanges(int[] start, int[] end) {
+        normalizeSections();
+        int n = Math.min(SECTION_COUNT, Math.min(start.length, end.length) - 1);
+        if (n < 1) return;
+        firstClassStart = formatHm(start[1]);
+        for (int i = 1; i <= n; i++) {
+            Section s = section(i);
+            s.durationMinutes = Math.max(1, end[i] - start[i]);
+            if (i < n) s.breakAfterMinutes = Math.max(0, start[i + 1] - end[i]);
+        }
+    }
+
     public String rangeLabel(int sectionNumber) {
         return startTime(sectionNumber) + "-" + endTime(sectionNumber);
     }

@@ -68,6 +68,29 @@ public class TimetableSettingsActivity extends AppCompatActivity {
         renderStartDate();
         selectDays(displayDays);
         refreshPreview();
+
+        // 原来堆在课表「⋯」菜单里的两项挪到这里
+        android.widget.LinearLayout body = findViewById(R.id.tt_settings_body);
+        if (body != null) {
+            Ui.label(this, body, "DISPLAY · 显示");
+            android.widget.LinearLayout disp = Ui.card(this, body);
+            android.view.View fit = Ui.row(this, disp, "01", "一屏显示 10 节", "压缩课块高度，不用上下滑就能看全天",
+                    Prefs.fitAllSections(this) ? "ON" : "OFF", null);
+            fit.setBackgroundResource(Ui.selectable(this, false));
+            fit.setOnClickListener(v -> {
+                boolean on = !Prefs.fitAllSections(this);
+                Prefs.setFitAllSections(this, on);
+                android.view.ViewGroup row = (android.view.ViewGroup) v;
+                ((android.widget.TextView) row.getChildAt(row.getChildCount() - 1)).setText(on ? "ON" : "OFF");
+            });
+
+            Ui.label(this, body, "MORE · 更多");
+            android.widget.LinearLayout card = Ui.card(this, body);
+            Ui.row(this, card, "01", "作息时间", "每节课几点上、几点下", "›",
+                    v -> startActivity(new android.content.Intent(this, ScheduleSettingsActivity.class)));
+            Ui.row(this, card, "02", "同步历史学期", "把以前学期的课表也拉下来存档", "›",
+                    v -> AppActions.run(this, "sync", "history"));
+        }
     }
 
     private void showDatePicker() {

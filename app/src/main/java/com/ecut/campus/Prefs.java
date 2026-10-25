@@ -176,6 +176,10 @@ public final class Prefs {
     }
 
     // ===== 0.4：外观、同步状态、新成绩 =====
+    /** 一屏显示全部 10 节（压缩课块高度）。 */
+    public static boolean fitAllSections(Context ctx) { return sp(ctx).getBoolean("fit_all_sections", false); }
+    public static void setFitAllSections(Context ctx, boolean v) { sp(ctx).edit().putBoolean("fit_all_sections", v).apply(); }
+
     public static int nightMode(Context ctx) { return sp(ctx).getInt("night_mode", 0); }
     public static void setNightMode(Context ctx, int m) { sp(ctx).edit().putInt("night_mode", m).apply(); }
 

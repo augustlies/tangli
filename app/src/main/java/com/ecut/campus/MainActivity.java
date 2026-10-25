@@ -50,7 +50,7 @@ import java.util.Date;
 import java.util.Locale;
 import java.util.List;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements AppActions.Host {
 
     private static final int REQ_VPN = 1001;
     private static final int REQ_IMPORT_JSON = 2001;
@@ -124,6 +124,68 @@ public class MainActivity extends AppCompatActivity {
         container.postDelayed(() -> {
             if (!isFinishing()) Updater.autoCheck(this);
         }, 1500);
+        // 从 tangli:// 链接冷启动
+        Intent launch = getIntent();
+        if (launch != null && (launch.getData() != null || launch.hasExtra(AppActions.EXTRA_ACTION))) {
+            container.post(() -> handleExternalIntent(launch));
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleExternalIntent(intent);
+    }
+
+    /** tangli:// 链接（弹预览）或其它页面转过来的动作（同步、切页签）。 */
+    private void handleExternalIntent(Intent intent) {
+        if (intent == null || isFinishing()) return;
+        String action = intent.getStringExtra(AppActions.EXTRA_ACTION);
+        if (action != null) {
+            String value = intent.getStringExtra(AppActions.EXTRA_VALUE);
+            intent.removeExtra(AppActions.EXTRA_ACTION);
+            runHostAction(action, value == null ? "" : value);
+            return;
+        }
+        Uri data = intent.getData();
+        if (data != null && CommandUi.SCHEME.equalsIgnoreCase(data.getScheme())) {
+            intent.setData(null);
+            showTab(TAB_TIMETABLE);
+            CommandUi.openLink(this, data, this::onCommandApplied);
+        }
+    }
+
+    @Override
+    public void runHostAction(String action, String value) {
+        if ("sync".equals(action)) {
+            showTab(TAB_TIMETABLE);
+            if ("grades".equals(value)) syncGrades();
+            else if ("history".equals(value)) syncHistorySemesters();
+            else syncTimetable();
+        } else if ("export".equals(action) && "ics".equals(value)) {
+            exportIcs();
+        } else if ("open".equals(action)) {
+            if ("settings".equals(value)) showTab(TAB_SETTINGS);
+            else if ("adblock".equals(value)) showTab(TAB_ADBLOCK);
+        }
+    }
+
+    /** 烫梨指令应用（或撤销）之后：课表重画；设置可能变了，拦截页和设置页下次打开时重建。 */
+    void onCommandApplied() {
+        refreshTimetableTab();
+        boolean rebuild = false;
+        if (adblockFragment != null) {
+            contentContainer.removeView(adblockFragment);
+            adblockFragment = null;
+            rebuild = true;
+        }
+        if (settingsFragment != null) {
+            contentContainer.removeView(settingsFragment);
+            settingsFragment = null;
+            rebuild = true;
+        }
+        if (rebuild && currentTab != TAB_TIMETABLE) showTab(currentTab);
     }
 
     private ViewGroup contentContainer;
@@ -209,7 +271,7 @@ public class MainActivity extends AppCompatActivity {
                 public void onMarkedClick(Timetable.Course course, Timetable.Session session,
                                           String label, String adjustId, boolean extra) {
                     CommandUi.onMarked(MainActivity.this, course, session, label, adjustId, extra,
-                            MainActivity.this::refreshTimetableTab, MainActivity.this::openCourseEditor);
+                            MainActivity.this::onCommandApplied, MainActivity.this::openCourseEditor);
                 }
 
                 @Override
@@ -217,7 +279,7 @@ public class MainActivity extends AppCompatActivity {
                                                boolean active, String label, String adjustId,
                                                boolean extra, int week) {
                     CommandUi.onLongPress(MainActivity.this, course, session, active, label, adjustId,
-                            extra, week, MainActivity.this::refreshTimetableTab,
+                            extra, week, MainActivity.this::onCommandApplied,
                             MainActivity.this::openCourseEditor);
                 }
 
@@ -245,49 +307,57 @@ public class MainActivity extends AppCompatActivity {
         }
 
         View addBtn = campusFragment.findViewById(R.id.btn_add_course);
-        if (addBtn != null) {
-            addBtn.setOnClickListener(v -> {
-                int day = WeekMath.todayDayOfWeek();
-                if (Prefs.displayDays(this) == 5) day = Math.min(5, day);
-                openCourseEditor(null, day, 1);
-            });
-        }
+        if (addBtn != null) addBtn.setOnClickListener(this::showEditMenu);
 
         View moreBtn = campusFragment.findViewById(R.id.btn_more);
         if (moreBtn != null) moreBtn.setOnClickListener(this::showTimetableMenu);
     }
 
-    private void showTimetableMenu(View anchor) {
+    /** 「＋」：改课表的三种方式。 */
+    private void showEditMenu(View anchor) {
         new GaugeMenu(this)
-                .add("切换学期")
-                .divider()
-                .add("同步课表")
-                .add("同步历史学期")
-                .divider()
-                .add("设置第一周")
-                .add("作息时间")
-                .add("课表设置")
-                .divider()
-                .add("导出课表 (ICS)")
+                .add("手动添加课程")
                 .divider()
                 .add("用 AI 改课表")
                 .add("粘贴烫梨指令")
-                .add("分享为烫梨指令")
                 .show(anchor, title -> {
                     if ("用 AI 改课表".equals(title)) CommandUi.copyAiGuide(this);
-                    else if ("粘贴烫梨指令".equals(title)) CommandUi.showPasteDialog(this, this::refreshTimetableTab);
-                    else if ("分享为烫梨指令".equals(title)) CommandUi.exportForShare(this);
-                    else if ("切换学期".equals(title)) showSemesterPicker();
-                    else if ("同步课表".equals(title)) syncTimetable();
-                    else if ("同步历史学期".equals(title)) syncHistorySemesters();
-                    else if ("作息时间".equals(title)) {
-                        startActivity(new Intent(this, ScheduleSettingsActivity.class));
-                    } else if ("导出课表 (ICS)".equals(title)) {
-                        exportIcs();
-                    } else {
-                        startActivity(new Intent(this, TimetableSettingsActivity.class));
+                    else if ("粘贴烫梨指令".equals(title)) CommandUi.showPasteDialog(this, this::onCommandApplied);
+                    else {
+                        int day = WeekMath.todayDayOfWeek();
+                        if (Prefs.displayDays(this) == 5) day = Math.min(5, day);
+                        openCourseEditor(null, day, 1);
                     }
                 });
+    }
+
+    /** 「⋯」：只留常用的四项，其余收进分享和课表设置。 */
+    private void showTimetableMenu(View anchor) {
+        new GaugeMenu(this)
+                .add("同步课表")
+                .add("切换学期")
+                .divider()
+                .add("分享课表")
+                .add("课表设置")
+                .show(anchor, title -> {
+                    if ("同步课表".equals(title)) syncTimetable();
+                    else if ("切换学期".equals(title)) showSemesterPicker();
+                    else if ("分享课表".equals(title)) showShareMenu(anchor);
+                    else startActivity(new Intent(this, TimetableSettingsActivity.class));
+                });
+    }
+
+    private void showShareMenu(View anchor) {
+        anchor.post(() -> new GaugeMenu(this)
+                .add("二维码")
+                .add("烫梨指令（发给同学）")
+                .divider()
+                .add("导出到日历 (ICS)")
+                .show(anchor, title -> {
+                    if ("二维码".equals(title)) startActivity(new Intent(this, ShareActivity.class));
+                    else if (title.startsWith("烫梨指令")) CommandUi.exportForShare(this);
+                    else exportIcs();
+                }));
     }
 
     private android.app.AlertDialog dialog;
@@ -856,6 +926,7 @@ public class MainActivity extends AppCompatActivity {
             timetableView.setDisplayDays(Prefs.displayDays(this));
             timetableView.setTotalWeeks(total);
             timetableView.setShowInactiveCourses(Prefs.showInactiveCourses(this));
+            timetableView.setFitAllSections(Prefs.fitAllSections(this));
             timetableView.setTimetable(currentTimetable, week);
             if (textDock != null && textDock.getHeight() > 0) {
                 timetableView.setBottomInset(textDock.getHeight());
@@ -925,6 +996,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         toggleBtn.setOnClickListener(v -> {
+            DiagLog.log(this, "dns", DnsFilterService.isRunning ? "用户关闭拦截" : "用户开启拦截");
             if (DnsFilterService.isRunning) {
                 startService(new Intent(this, DnsFilterService.class)
                         .setAction(DnsFilterService.ACTION_STOP));
@@ -1454,7 +1526,7 @@ public class MainActivity extends AppCompatActivity {
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         // Android 10+ 只有拿到焦点后才能读剪贴板：复制了 AI 给的烫梨指令，回来就弹预览
-        if (hasFocus) CommandUi.checkClipboard(this, this::refreshTimetableTab);
+        if (hasFocus) CommandUi.checkClipboard(this, this::onCommandApplied);
     }
 
     @Override

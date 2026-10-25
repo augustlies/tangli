@@ -76,7 +76,28 @@ public class AboutActivity extends AppCompatActivity {
                 "非官方工具，与东华理工大学无关。教务数据以学校系统为准，成绩计算仅供参考。烫梨不保存任何账号密码。",
                 12f, G.MUTE);
         note.setPadding(Ui.dp(this, 4), Ui.dp(this, 14), Ui.dp(this, 4), 0);
+
+        // 连点 7 次版本号进入调试台
+        TextView ver = Ui.text(this, col, "烫梨 v" + BuildConfig.VERSION_NAME + " · build " + BuildConfig.VERSION_CODE,
+                11f, G.MUTE);
+        ver.setTypeface(android.graphics.Typeface.MONOSPACE);
+        ver.setPadding(Ui.dp(this, 4), Ui.dp(this, 18), Ui.dp(this, 4), Ui.dp(this, 8));
+        ver.setOnClickListener(v -> {
+            long now = android.os.SystemClock.uptimeMillis();
+            if (now - lastVerTap > 1500) verTaps = 0;
+            lastVerTap = now;
+            verTaps++;
+            if (verTaps >= 7) {
+                verTaps = 0;
+                startActivity(new Intent(this, DebugActivity.class));
+            } else if (verTaps >= 4) {
+                Toast.makeText(this, "再点 " + (7 - verTaps) + " 次进入调试台", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
+
+    private int verTaps;
+    private long lastVerTap;
 
     /** Ui.row 返回的行：[序号, 文字列, 右侧]；拿到副标题和右侧标记，用来显示检查结果。 */
     private void bindUpdateRow(View row) {
