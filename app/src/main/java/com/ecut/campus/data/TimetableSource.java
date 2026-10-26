@@ -34,4 +34,14 @@ public interface TimetableSource {
 
     /** 原始文本 → 课表。永不抛异常；失败时 courseCount=0 并带 warnings。 */
     JwglxtFetcher.Result parse(String raw);
+
+    /** 给用户看的名字（如「正方」「强智移动版」）。 */
+    default String label() {
+        return vendor().label;
+    }
+
+    /** 认出了系统但没读到课表时，告诉用户下一步怎么做。 */
+    default String emptyHint(JwglxtFetcher.Result r) {
+        return "请先在教务里打开「我的课表」（学期课表）页面，再点「导入此页课表」。";
+    }
 }

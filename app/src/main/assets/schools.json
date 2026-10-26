@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "dataVersion": "2026.10.26-1",
+  "dataVersion": "2026.10.26-2",
   "schools": [
     {
       "id": "ecut",
@@ -13,6 +13,24 @@
       "hosts": ["*.ecut.edu.cn", "172.20.130.13"],
       "verified": true,
       "ecutFeatures": true
+    },
+    {
+      "id": "nju",
+      "name": "南京大学（本科）",
+      "aliases": ["南大", "NJU", "南京大学"],
+      "vendor": "other",
+      "loginUrl": "https://authserver.nju.edu.cn/authserver/login?service=https%3A%2F%2Fehallapp.nju.edu.cn%2Fjwapp%2Fsys%2Fwdkb%2F*default%2Findex.do%23%2Fxskcb",
+      "hosts": ["*.nju.edu.cn"],
+      "verified": false
+    },
+    {
+      "id": "nju_grad",
+      "name": "南京大学（研究生）",
+      "aliases": ["南大研究生", "NJU"],
+      "vendor": "other",
+      "loginUrl": "https://authserver.nju.edu.cn/authserver/login?service=https%3A%2F%2Fehallapp.nju.edu.cn%2Fgsapp%2Fsys%2Fwdkbapp%2F*default%2Findex.do%23%2Fxskcb",
+      "hosts": ["*.nju.edu.cn"],
+      "verified": false
     }
   ]
 }

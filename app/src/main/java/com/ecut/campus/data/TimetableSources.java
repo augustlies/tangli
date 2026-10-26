@@ -12,8 +12,10 @@ public final class TimetableSources {
 
     private static final ZhengfangSource ZHENGFANG = new ZhengfangSource();
     private static final QiangzhiSource QIANGZHI = new QiangzhiSource();
+    private static final QiangzhiH5Source QIANGZHI_H5 = new QiangzhiH5Source();
+    private static final WiseduSource WISEDU = new WiseduSource();
     private static final List<TimetableSource> ALL =
-            Collections.unmodifiableList(Arrays.asList(ZHENGFANG, QIANGZHI));
+            Collections.unmodifiableList(Arrays.asList(ZHENGFANG, QIANGZHI, QIANGZHI_H5, WISEDU));
 
     private TimetableSources() {}
 

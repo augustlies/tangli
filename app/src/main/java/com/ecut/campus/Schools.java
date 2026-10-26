@@ -18,6 +18,7 @@ import java.util.List;
 public final class Schools {
 
     private static List<SchoolProfile> builtin;
+    private static com.ecut.campus.data.SchoolDirectory directory;
 
     private Schools() {}
 
@@ -36,6 +37,22 @@ public final class Schools {
         if (SchoolProfile.find(list, SchoolProfile.ECUT_ID) == null) list.add(0, ecutFallback());
         builtin = list;
         return list;
+    }
+
+    /** assets/school-directory.json：公开整理的学校教务入口，用来按校名搜索。 */
+    public static synchronized com.ecut.campus.data.SchoolDirectory directory(Context ctx) {
+        if (directory != null) return directory;
+        String json = "";
+        try (InputStream in = ctx.getApplicationContext().getAssets().open("school-directory.json");
+             ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) bos.write(buf, 0, n);
+            json = new String(bos.toByteArray(), StandardCharsets.UTF_8);
+        } catch (Exception ignored) {
+        }
+        directory = com.ecut.campus.data.SchoolDirectory.parse(json);
+        return directory;
     }
 
     public static SchoolProfile current(Context ctx) {
