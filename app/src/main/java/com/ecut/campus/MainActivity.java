@@ -55,6 +55,8 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
 
     private static final int REQ_VPN = 1001;
     private static final int REQ_IMPORT_JSON = 2001;
+    private static final int REQ_FIND_SCHOOL = 2002;
+    private String pendingFinderName;
     private static final int TAB_TIMETABLE = 0;
     private static final int TAB_ADBLOCK = 1;
     private static final int TAB_SETTINGS = 2;
@@ -1737,7 +1739,9 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
         TextView sub = settingsFragment.findViewById(R.id.tv_settings_school_sub);
         if (sub != null) {
             String detail = school.isEcut() ? "已适配 · 课表、成绩、校历、地图"
-                    : school.vendor.label + "教务"
+                    : (school.vendor == SchoolProfile.Vendor.OTHER
+                        && school.loginUrl != null && school.loginUrl.contains("wdkb")
+                        ? "金智" : school.vendor.label) + "教务"
                     + (school.supportsBackgroundSync() ? " · 可后台同步课表" : " · 在教务页「导入此页课表」")
                     + (school.supportsGrades() ? " · 成绩" : "");
             sub.setText(school.name + " · " + detail);
@@ -1784,28 +1788,126 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
         List<SchoolProfile> builtins = Schools.builtin(this);
         SchoolProfile cur = Schools.current(this);
         SchoolProfile custom = Schools.custom(this);
-        String[] items = new String[builtins.size() + 1];
-        for (int i = 0; i < builtins.size(); i++) {
-            SchoolProfile p = builtins.get(i);
-            items[i] = p.name + (p.id.equals(cur.id) ? "  ✓" : "");
-        }
-        items[builtins.size()] = custom == null ? "自定义学校（输入教务网址）"
-                : "自定义学校：" + custom.name + (cur.isCustom() ? "  ✓" : "") + "（点此修改）";
-        new AlertDialog.Builder(this)
+        com.ecut.campus.data.SchoolDirectory dir = Schools.directory(this);
+        int pad = Math.round(20 * getResources().getDisplayMetrics().density);
+
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(pad, pad / 2, pad, 0);
+        android.widget.EditText search = new android.widget.EditText(this);
+        search.setHint("搜学校名，如 华东理工");
+        search.setSingleLine(true);
+        box.addView(search);
+        android.widget.ListView list = new android.widget.ListView(this);
+        list.setDivider(null);
+        box.addView(list, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                Math.round(320 * getResources().getDisplayMetrics().density)));
+
+        // 每一行：名字 + 小字说明；行为由 actions 决定
+        List<String[]> rows = new ArrayList<>();
+        List<Runnable> actions = new ArrayList<>();
+        AlertDialog[] holder = new AlertDialog[1];
+        android.widget.ArrayAdapter<String[]> adapter = new android.widget.ArrayAdapter<String[]>(
+                this, android.R.layout.simple_list_item_2, android.R.id.text1, rows) {
+            @Override
+            public View getView(int pos, View convert, ViewGroup parent) {
+                View v = super.getView(pos, convert, parent);
+                String[] r = getItem(pos);
+                TextView t1 = v.findViewById(android.R.id.text1);
+                TextView t2 = v.findViewById(android.R.id.text2);
+                t1.setText(r[0]);
+                t1.setTextSize(15);
+                t2.setText(r[1]);
+                t2.setTextSize(12);
+                t2.setVisibility(r[1].isEmpty() ? View.GONE : View.VISIBLE);
+                return v;
+            }
+        };
+        list.setAdapter(adapter);
+        Runnable refill = () -> {
+            String q = search.getText().toString().trim();
+            rows.clear();
+            actions.clear();
+            for (SchoolProfile p : builtins) {
+                if (!q.isEmpty() && !p.name.contains(q) && !(q.length() >= 2 && p.aliasMatch(q))) continue;
+                rows.add(new String[]{p.name + (p.id.equals(cur.id) ? "  ✓" : ""), p.supportsBackgroundSync() || p.isEcut()
+                        ? "已适配，可后台同步" : "已适配 · 登录后自动打开「我的课表」，点「导入此页课表」"});
+                actions.add(() -> {
+                    holder[0].dismiss();
+                    if (p.id.equals(cur.id)) return;
+                    Schools.select(this, p);
+                    refreshSettingsTab();
+                    Toast.makeText(this, "已切换到 " + p.name, Toast.LENGTH_SHORT).show();
+                });
+            }
+            if (custom != null && (q.isEmpty() || custom.name.contains(q))) {
+                rows.add(new String[]{custom.name + (cur.isCustom() ? "  ✓" : ""),
+                        "自定义学校 · 点此修改网址"});
+                actions.add(() -> { holder[0].dismiss(); showCustomSchoolDialog(custom); });
+            }
+            if (q.isEmpty()) {
+                rows.add(new String[]{"输入校名搜索", "收录了 " + dir.size() + " 所学校的教务入口"});
+                actions.add(() -> {});
+            } else {
+                for (com.ecut.campus.data.SchoolDirectory.Entry e : dir.search(q, 40)) {
+                    rows.add(new String[]{e.name, e.typeLabel() + (e.importable() ? "" : " · 暂不能导入课表")
+                            + " · " + SchoolProfile.hostOf(e.url)});
+                    actions.add(() -> { holder[0].dismiss(); confirmDirectorySchool(e); });
+                }
+                rows.add(new String[]{"没找到 / 网址不对？帮我找", "在网上搜「" + q + " 教务系统」，点进登录页后一键填入"});
+                actions.add(() -> { holder[0].dismiss(); openSchoolFinder(q); });
+            }
+            rows.add(new String[]{"手动输入教务网址", "知道网址就直接填"});
+            actions.add(() -> { holder[0].dismiss(); showCustomSchoolDialog(custom); });
+            adapter.notifyDataSetChanged();
+        };
+        list.setOnItemClickListener((parent, v, pos, id) -> {
+            if (pos >= 0 && pos < actions.size()) actions.get(pos).run();
+        });
+        search.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence c, int a, int b, int d) {}
+            @Override public void onTextChanged(CharSequence c, int a, int b, int d) {}
+            @Override public void afterTextChanged(android.text.Editable e) { refill.run(); }
+        });
+        refill.run();
+        holder[0] = new AlertDialog.Builder(this)
                 .setTitle("选择学校")
-                .setItems(items, (d, which) -> {
-                    if (which < builtins.size()) {
-                        SchoolProfile p = builtins.get(which);
-                        if (p.id.equals(cur.id)) return;
-                        Schools.select(this, p);
-                        refreshSettingsTab();
-                        Toast.makeText(this, "已切换到 " + p.name, Toast.LENGTH_SHORT).show();
-                    } else {
-                        showCustomSchoolDialog(custom);
-                    }
-                })
+                .setView(box)
                 .setNegativeButton("取消", null)
                 .show();
+    }
+
+    /** 目录里的学校：先说清楚是什么系统、网址可能过时，再去登录。 */
+    private void confirmDirectorySchool(com.ecut.campus.data.SchoolDirectory.Entry e) {
+        SchoolProfile p = com.ecut.campus.data.SchoolDirectory.toProfile(e);
+        if (p == null) {
+            Toast.makeText(this, "这个网址不对，换「帮我找」试试", Toast.LENGTH_LONG).show();
+            openSchoolFinder(e.name);
+            return;
+        }
+        String msg = "教务系统：" + e.typeLabel()
+                + (e.importable() ? "（烫梨能导入课表）" : "（烫梨暂时读不了这类课表，可以先登录看看）")
+                + ("金智".equals(e.typeLabel()) ? "\n登录后选「学生」，在大厅里打开「我的课表」，课表显示出来再点「导入此页课表」。" : "")
+                + "\n入口：" + e.url
+                + "\n\n这个网址来自公开整理，可能已经换了。打开后要是不是你们的教务登录页，回来点「帮我找」。";
+        new AlertDialog.Builder(this)
+                .setTitle(e.name)
+                .setMessage(msg)
+                .setNeutralButton("帮我找", (d, w) -> openSchoolFinder(e.name))
+                .setNegativeButton("取消", null)
+                .setPositiveButton("去登录", (d, w) -> {
+                    Schools.select(this, p);
+                    refreshSettingsTab();
+                    openWeb("portal");
+                })
+                .show();
+    }
+
+    private void openSchoolFinder(String school) {
+        pendingFinderName = school;
+        Intent i = new Intent(this, SchoolFinderActivity.class);
+        i.putExtra(SchoolFinderActivity.EXTRA_QUERY, school);
+        startActivityForResult(i, REQ_FIND_SCHOOL);
     }
 
     private void showCustomSchoolDialog(SchoolProfile existing) {
@@ -1866,7 +1968,17 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
                     if (!n.isEmpty()) p.name = n;
                     Schools.select(this, p);
                     refreshSettingsTab();
-                    String msg = p.vendor == SchoolProfile.Vendor.OTHER
+                    boolean h5 = p.vendor == SchoolProfile.Vendor.OTHER
+                            && new com.ecut.campus.data.QiangzhiH5Source().detect(p.loginUrl, null)
+                            >= com.ecut.campus.data.TimetableSources.MIN_CONFIDENCE;
+                    boolean wisedu = p.vendor == SchoolProfile.Vendor.OTHER && !h5
+                            && new com.ecut.campus.data.WiseduSource().detect(p.loginUrl, null)
+                            >= com.ecut.campus.data.TimetableSources.MIN_CONFIDENCE;
+                    String msg = wisedu
+                            ? "识别为金智网上办事大厅。登录后选「学生」，在大厅里打开「我的课表」，等课表出来再点底部的「导入此页课表」；这类系统不能后台同步。"
+                            : h5
+                            ? "识别为强智移动版教务。登录后在首页点底部的「导入此页课表」就行；这类系统不能后台同步，课表有变化时再打开网页导一次。"
+                            : p.vendor == SchoolProfile.Vendor.OTHER
                             ? "没认出教务系统类型。登录后进入课表页，点底部的「导入此页课表」试试。"
                             : "识别为" + p.vendor.label + "教务。先登录一次教务系统，之后就能同步课表"
                             + (p.supportsGrades() ? "和成绩" : "") + "。";
@@ -1901,6 +2013,18 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_FIND_SCHOOL) {
+            String url = resultCode == RESULT_OK && data != null
+                    ? data.getStringExtra(SchoolFinderActivity.EXTRA_URL) : null;
+            if (url == null) return;
+            SchoolProfile found = SchoolProfile.custom(url, null);
+            if (found == null) return;
+            if (pendingFinderName != null && !pendingFinderName.trim().isEmpty()) {
+                found.name = pendingFinderName.trim();
+            }
+            showCustomSchoolDialog(found);
+            return;
+        }
         if (requestCode == REQ_VPN) {
             if (resultCode == RESULT_OK) doStartVpn();
             else if (statusText != null) statusText.setText("VPN 授权被拒绝，无法开启拦截");
