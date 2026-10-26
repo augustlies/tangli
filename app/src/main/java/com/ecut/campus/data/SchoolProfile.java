@@ -81,9 +81,20 @@ public final class SchoolProfile {
     public String loginUrl = "";
     /** 允许打开的域名。{@code *.example.edu.cn} 同时匹配 example.edu.cn 本身。 */
     public List<String> hosts = new ArrayList<>();
+    public List<String> aliases = new ArrayList<>();
     public boolean verified;
     /** 校历、校园地图、办事大厅等东华理工专属功能。 */
     public boolean ecutFeatures;
+
+    /** 搜索词是否命中别名（如「南大」「NJU」）。 */
+    public boolean aliasMatch(String q) {
+        String lq = q.toLowerCase(Locale.ROOT);
+        for (String a : aliases) {
+            String la = a.toLowerCase(Locale.ROOT);
+            if (la.contains(lq) || lq.contains(la)) return true;
+        }
+        return false;
+    }
 
     public boolean isEcut() {
         return ECUT_ID.equals(id);
@@ -173,6 +184,11 @@ public final class SchoolProfile {
                 String h = hs.optString(i, "").trim();
                 if (!h.isEmpty()) p.hosts.add(h);
             }
+        }
+        JSONArray al = o.optJSONArray("aliases");
+        for (int i = 0; al != null && i < al.length(); i++) {
+            String a = al.optString(i, "").trim();
+            if (!a.isEmpty()) p.aliases.add(a);
         }
         p.verified = o.optBoolean("verified", false);
         p.ecutFeatures = o.optBoolean("ecutFeatures", false);

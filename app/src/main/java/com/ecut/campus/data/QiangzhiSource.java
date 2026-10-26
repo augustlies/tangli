@@ -101,8 +101,11 @@ public final class QiangzhiSource implements TimetableSource {
         }
         return "(function(){" +
                 "try{" +
-                "function pick(doc){var t=doc.getElementById('kbtable');if(!t)return '';" +
-                "var s=doc.getElementById('xnxq01id');" +
+                // #kbtable，或新版界面里任何装着 .kbcontent 的表格
+                "function pick(doc){var t=doc.getElementById('kbtable');" +
+                "if(!t){var ts=doc.getElementsByTagName('table');for(var j=0;j<ts.length;j++){" +
+                "if(ts[j].querySelector&&ts[j].querySelector('.kbcontent')){t=ts[j];break;}}}" +
+                "if(!t)return '';var s=doc.getElementById('xnxq01id');" +
                 "return (s?s.outerHTML:'')+t.outerHTML;}" +
                 "var want='" + term + "';" +
                 "if(!want){var r=pick(document);if(r)return r;" +
@@ -110,11 +113,28 @@ public final class QiangzhiSource implements TimetableSource {
                 "if(r2)return r2;}catch(e){}}}" +
                 "var p=location.pathname;var i=p.indexOf('/jsxsd/');" +
                 "var base=i>=0?p.substring(0,i+7):'/jsxsd/';" +
-                "var x=new XMLHttpRequest();" +
-                "x.open('GET',base+'xskb/xskb_list.do'+(want?'?xnxq01id='+encodeURIComponent(want):''),false);" +
-                "x.send();var txt=x.responseText||'';" +
-                "try{var d=new DOMParser().parseFromString(txt,'text/html');var r3=pick(d);if(r3)return r3;}catch(e){}" +
-                "return txt.indexOf('kbtable')>=0?txt:'NOTABLE';" +
+                // 候选课表地址：页面菜单里出现过的 xskb 链接优先（新版首页 xsMainV.htmlx 的菜单），再试常见地址
+                "var cands=[];function add(u){if(u&&cands.indexOf(u)<0)cands.push(u);}" +
+                "var all=document.documentElement.outerHTML;" +
+                "for(var f2=0;f2<window.frames.length;f2++){try{all+=window.frames[f2].document.documentElement.outerHTML;}catch(e){}}" +
+                "var re=/[\\w\\/.-]*xskb\\/xskb_list\\.[a-z]+[^'\\\"\\s<>)]*/gi,m;" +
+                "while((m=re.exec(all))&&cands.length<4){var u=m[0].replace(/&amp;/g,'&');" +
+                "if(u.indexOf('/')!==0)u=base+u.substring(u.indexOf('xskb/'));add(u);}" +
+                "var q=want?'xnxq01id='+encodeURIComponent(want):'';" +
+                "add(base+'xskb/xskb_list.do?Ves632DSdyV=NEW_XSD_PYGL'+(q?'&'+q:''));" +
+                "add(base+'xskb/xskb_list.do'+(q?'?'+q:''));" +
+                "add(base+'xskb/xskb_list.htmlx'+(q?'?'+q:''));" +
+                "var diag=[];" +
+                "for(var c=0;c<cands.length;c++){try{" +
+                "var x=new XMLHttpRequest();x.open('GET',cands[c],false);x.send();var txt=x.responseText||'';" +
+                "var d=null;try{d=new DOMParser().parseFromString(txt,'text/html');}catch(e){}" +
+                "var r3=d?pick(d):'';if(r3)return r3;" +
+                "if(txt.indexOf('kbtable')>=0)return txt;" +
+                "var tt=d&&d.title?d.title:'';" +
+                "diag.push(cands[c].replace(/\\?.*$/,'')+' '+x.status+' '+txt.length+'B '+tt.substring(0,20)" +
+                "+(txt.indexOf('kbcontent')>=0?' kbcontent':''));" +
+                "}catch(e){diag.push(cands[c].replace(/\\?.*$/,'')+' ERR');}}" +
+                "return 'NOTABLE|'+diag.join(' ; ');" +
                 "}catch(e){return 'ERR:'+e;}" +
                 "})()";
     }
@@ -129,6 +149,11 @@ public final class QiangzhiSource implements TimetableSource {
         JwglxtFetcher.Result r = new JwglxtFetcher.Result();
         if (html == null || html.trim().isEmpty() || html.startsWith("ERR:") || html.startsWith("NOTABLE")) {
             r.warnings.add("页面里没有课表表格");
+            // 诊断：试过的课表地址、状态码、长度、标题（不含课表内容和学生信息）
+            if (html != null && html.startsWith("NOTABLE|") && html.length() > 8) {
+                String d = html.substring(8);
+                r.warnings.add("试过: " + (d.length() > 400 ? d.substring(0, 400) : d));
+            }
             return r;
         }
         parseSemester(html, r.timetable.semester);

@@ -83,6 +83,11 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".SchoolFinderActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
             android:name=".DebugActivity"
             android:exported="false" />
 
