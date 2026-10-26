@@ -74,6 +74,8 @@ public class WeekDialView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
+        // 上下渐隐用遮罩（DST_OUT）做，不再盖一层卡片色：弹窗是半透明玻璃时也不会露出一块直角框
+        int layer = canvas.saveLayer(0, 0, getWidth(), getHeight(), null);
         int w = getWidth(), h = getHeight();
         float rowH = dp(40);
         float centerY = h / 2f;
@@ -108,13 +110,16 @@ public class WeekDialView extends View {
         canvas.drawRoundRect(new RectF(dp(6), centerY - dp(14), dp(10), centerY + dp(14)),
                 dp(2), dp(2), center);
 
+        fade.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.DST_OUT));
         fade.setShader(new android.graphics.LinearGradient(
-                0, 0, 0, dp(26), G.CARD, G.CLEAR, android.graphics.Shader.TileMode.CLAMP));
-        canvas.drawRect(0, 0, w, dp(26), fade);
+                0, 0, 0, dp(40), 0xFF000000, 0x00000000, android.graphics.Shader.TileMode.CLAMP));
+        canvas.drawRect(0, 0, w, dp(40), fade);
         fade.setShader(new android.graphics.LinearGradient(
-                0, h, 0, h - dp(26), G.CARD, G.CLEAR, android.graphics.Shader.TileMode.CLAMP));
-        canvas.drawRect(0, h - dp(26), w, h, fade);
+                0, h, 0, h - dp(40), 0xFF000000, 0x00000000, android.graphics.Shader.TileMode.CLAMP));
+        canvas.drawRect(0, h - dp(40), w, h, fade);
         fade.setShader(null);
+        fade.setXfermode(null);
+        canvas.restoreToCount(layer);
     }
 
     private static int blend(int color, float dist) {

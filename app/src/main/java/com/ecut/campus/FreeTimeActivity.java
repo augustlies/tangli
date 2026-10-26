@@ -40,7 +40,7 @@ public class FreeTimeActivity extends AppCompatActivity {
         G.init(this);
         schedule = ScheduleSettingsStore.load(this);
         myStart = WeekMath.effectiveStart(Prefs.semesterStartDate(this),
-                TimetableStore.load(this).semester.id);
+                TimetableStore.load(this).semester.id, Schools.current(this).isEcut());
         week = Prefs.hasCurrentWeek(this) ? Prefs.currentWeek(this)
                 : WeekMath.currentWeek(myStart, WeekMath.openWeekSpan(myStart));
         names.add("我");
@@ -88,7 +88,7 @@ public class FreeTimeActivity extends AppCompatActivity {
         nl.topMargin = Ui.dp(this, 14);
         col.addView(nav, nl);
 
-        int sections = ScheduleSettings.SECTION_COUNT;
+        int sections = ScheduleSettingsStore.load(this).sectionCount();
         int days = Prefs.displayDays(this) == 5 ? 5 : 7;
         int[][] busyCount = new int[7][sections];
         for (Timetable t : tables) {

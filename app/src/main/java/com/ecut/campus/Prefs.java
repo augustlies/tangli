@@ -180,6 +180,10 @@ public final class Prefs {
     public static boolean fitAllSections(Context ctx) { return sp(ctx).getBoolean("fit_all_sections", false); }
     public static void setFitAllSections(Context ctx, boolean v) { sp(ctx).edit().putBoolean("fit_all_sections", v).apply(); }
 
+    /** 0 纸墨，1 磨砂玻璃。 */
+    public static int theme(Context ctx) { return sp(ctx).getInt("ui_theme", 0); }
+    public static void setTheme(Context ctx, int t) { sp(ctx).edit().putInt("ui_theme", t).commit(); }
+
     public static int nightMode(Context ctx) { return sp(ctx).getInt("night_mode", 0); }
     public static void setNightMode(Context ctx, int m) { sp(ctx).edit().putInt("night_mode", m).apply(); }
 
@@ -210,4 +214,16 @@ public final class Prefs {
 
     public static String shareName(Context ctx) { return sp(ctx).getString("share_name", ""); }
     public static void setShareName(Context ctx, String n) { sp(ctx).edit().putString("share_name", n).apply(); }
+
+    // ===== 1.2.4：多学校 =====
+    /** 当前学校 id；没选过默认东华理工，老用户升级无感。 */
+    public static String schoolId(Context ctx) {
+        String id = sp(ctx).getString("school_id", "");
+        return id == null || id.isEmpty() ? com.ecut.campus.data.SchoolProfile.ECUT_ID : id;
+    }
+    public static void setSchoolId(Context ctx, String id) { sp(ctx).edit().putString("school_id", id).apply(); }
+
+    /** 自定义学校（SchoolProfile JSON）。 */
+    public static String customSchoolJson(Context ctx) { return sp(ctx).getString("custom_school", ""); }
+    public static void setCustomSchoolJson(Context ctx, String json) { sp(ctx).edit().putString("custom_school", json).apply(); }
 }

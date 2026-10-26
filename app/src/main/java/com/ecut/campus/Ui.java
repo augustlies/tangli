@@ -24,7 +24,7 @@ public final class Ui {
     /** 建一个可滚动页面，返回放内容的竖向容器。 */
     public static LinearLayout page(Activity a, String backLabel, String title, String sub) {
         ScrollView sv = new ScrollView(a);
-        sv.setBackgroundColor(G.PAPER);
+        sv.setBackgroundColor(G.BG);
         sv.setFillViewport(true);
         LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);
@@ -65,8 +65,10 @@ public final class Ui {
             col.addView(s, sl);
         }
         a.setContentView(sv);
-        a.getWindow().setStatusBarColor(G.PAPER);
-        a.getWindow().setNavigationBarColor(G.PAPER);
+        if (!G.GLASS) {
+            a.getWindow().setStatusBarColor(G.PAPER);
+            a.getWindow().setNavigationBarColor(G.PAPER);
+        }
         return col;
     }
 
@@ -90,9 +92,9 @@ public final class Ui {
         LinearLayout c = new LinearLayout(a);
         c.setOrientation(LinearLayout.VERTICAL);
         GradientDrawable bg = new GradientDrawable();
-        bg.setCornerRadius(dp(a, 8));
+        bg.setCornerRadius(dp(a, G.CARD_RADIUS));
         bg.setColor(G.CARD);
-        bg.setStroke(Math.max(1, dp(a, 1)), G.LINE);
+        bg.setStroke(Math.max(1, dp(a, 1)), G.CARD_STROKE);
         c.setBackground(bg);
         c.setClipToOutline(true);
         parent.addView(c, new LinearLayout.LayoutParams(

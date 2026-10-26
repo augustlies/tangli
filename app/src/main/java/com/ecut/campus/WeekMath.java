@@ -62,8 +62,17 @@ public final class WeekMath {
      * 先按学期 id 找，学期 id 未知时取今天所在学期。都找不到返回空串。
      */
     public static String effectiveStart(String startDate, String semesterId) {
+        return effectiveStart(startDate, semesterId, true);
+    }
+
+    /**
+     * @param builtinCalendar 能否用东华理工内置校历兜底；其他学校传 false，
+     *                        没设开学日期时返回空串，界面提示用户去设置。
+     */
+    public static String effectiveStart(String startDate, String semesterId, boolean builtinCalendar) {
         String s = normalizeToMonday(startDate);
         if (!s.isEmpty()) return s;
+        if (!builtinCalendar) return "";
         AcademicCalendar.Term t = AcademicCalendar.termById(semesterId);
         if (t == null && (semesterId == null || semesterId.isEmpty())) {
             t = AcademicCalendar.termFor(todayDateLabel());

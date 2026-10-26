@@ -1,6 +1,5 @@
 package com.ecut.campus;
 
-import android.app.DatePickerDialog;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
@@ -74,7 +73,7 @@ public class TimetableSettingsActivity extends AppCompatActivity {
         if (body != null) {
             Ui.label(this, body, "DISPLAY · 显示");
             android.widget.LinearLayout disp = Ui.card(this, body);
-            android.view.View fit = Ui.row(this, disp, "01", "一屏显示 10 节", "压缩课块高度，不用上下滑就能看全天",
+            android.view.View fit = Ui.row(this, disp, "01", "一屏显示全部节次", "压缩课块高度，不用上下滑就能看全天",
                     Prefs.fitAllSections(this) ? "ON" : "OFF", null);
             fit.setBackgroundResource(Ui.selectable(this, false));
             fit.setOnClickListener(v -> {
@@ -96,7 +95,8 @@ public class TimetableSettingsActivity extends AppCompatActivity {
     private void showDatePicker() {
         Calendar cal = WeekMath.parseDate(startDate);
         if (cal == null) cal = Calendar.getInstance();
-        new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+        GaugePickers.date(this, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH), true,
+                (year, month, dayOfMonth) -> {
             String picked = String.format(java.util.Locale.US, "%04d-%02d-%02d",
                     year, month + 1, dayOfMonth);
             startDate = WeekMath.normalizeToMonday(picked);
@@ -105,7 +105,7 @@ public class TimetableSettingsActivity extends AppCompatActivity {
             if (!picked.equals(startDate)) {
                 Toast.makeText(this, "已调整为当周周一：" + startDate, Toast.LENGTH_SHORT).show();
             }
-        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show();
+        });
     }
 
     private void renderStartDate() {

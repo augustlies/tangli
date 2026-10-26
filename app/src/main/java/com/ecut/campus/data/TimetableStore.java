@@ -144,16 +144,24 @@ public final class TimetableStore {
             for (Timetable.Course c : local.courses) localByKey.put(c.key, c);
         }
 
-        // 1. 教务返回的课程：覆盖内容，保留用户的 note。colorIndex 不回填，
-        // 教务课程统一由 CourseColorAssigner 按课程名重新分配。
+        // 1. 教务返回的课程：覆盖内容，保留用户的 note 和颜色。
+        // 颜色按课程沿用（对不上 key 就按课程名），CourseColorAssigner 只给新课和撞色的课换色，
+        // 所以同步一次颜色不会整体挪位。
+        Map<String, Integer> colorByName = new java.util.HashMap<>();
+        if (local != null) {
+            for (Timetable.Course c : local.courses) {
+                colorByName.putIfAbsent(CourseColorAssigner.normalizeName(c.name), c.colorIndex);
+            }
+        }
         for (Timetable.Course rc : remote.courses) {
             Timetable.Course existing = localByKey.remove(rc.key);
             if (existing != null) {
                 rc.note = existing.note;
-                if (existing.colorTouched) {
-                    rc.colorIndex = existing.colorIndex;
-                    rc.colorTouched = true;
-                }
+                rc.colorIndex = existing.colorIndex;
+                if (existing.colorTouched) rc.colorTouched = true;
+            } else {
+                Integer known = colorByName.get(CourseColorAssigner.normalizeName(rc.name));
+                if (known != null) rc.colorIndex = known;
             }
             out.courses.add(rc);
         }

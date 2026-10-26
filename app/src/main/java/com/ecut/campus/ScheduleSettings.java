@@ -17,14 +17,17 @@ import java.util.Locale;
 public final class ScheduleSettings {
 
     public static final int SCHEMA_VERSION = 1;
-    public static final int SECTION_COUNT = 10;
+    /** 每天最多几节：不同学校从 8 节到 16 节不等，作息表按最大值存，sectionCount 决定显示几节。 */
+    public static final int MAX_SECTIONS = 16;
+    public static final int MIN_SECTIONS = 8;
+    public static final int DEFAULT_SECTION_COUNT = 10;
     public static final String DEFAULT_FIRST_CLASS_START = "08:00";
 
     private static final int[] DEFAULT_DURATIONS = {
-            45, 45, 45, 45, 45, 45, 45, 45, 45, 45
+            45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45
     };
     private static final int[] DEFAULT_BREAKS = {
-            10, 20, 10, 140, 10, 20, 10, 80, 10, 0
+            10, 20, 10, 140, 10, 20, 10, 80, 10, 10, 10, 10, 10, 10, 10, 0
     };
 
     public static final class Section {
@@ -50,6 +53,8 @@ public final class ScheduleSettings {
     }
 
     public String firstClassStart = DEFAULT_FIRST_CLASS_START;
+    /** 每天显示几节（MIN_SECTIONS..MAX_SECTIONS）。 */
+    public int sectionCount = DEFAULT_SECTION_COUNT;
     public List<Section> sections = new ArrayList<>();
 
     public ScheduleSettings() {
@@ -62,15 +67,16 @@ public final class ScheduleSettings {
 
     public void resetToDefaults() {
         firstClassStart = DEFAULT_FIRST_CLASS_START;
+        sectionCount = DEFAULT_SECTION_COUNT;
         sections.clear();
-        for (int i = 0; i < SECTION_COUNT; i++) {
+        for (int i = 0; i < MAX_SECTIONS; i++) {
             sections.add(new Section(i + 1, DEFAULT_DURATIONS[i], DEFAULT_BREAKS[i]));
         }
     }
 
     public Section section(int sectionNumber) {
-        int idx = Math.max(0, Math.min(SECTION_COUNT - 1, sectionNumber - 1));
-        if (sections.size() < SECTION_COUNT) normalizeSections();
+        int idx = Math.max(0, Math.min(MAX_SECTIONS - 1, sectionNumber - 1));
+        if (sections.size() < MAX_SECTIONS) normalizeSections();
         return sections.get(idx);
     }
 
@@ -101,14 +107,53 @@ public final class ScheduleSettings {
     /** 按每节起止（分钟，下标 = 节次）回写成「第 1 节开始 + 时长 + 课间」。 */
     public void applyRanges(int[] start, int[] end) {
         normalizeSections();
-        int n = Math.min(SECTION_COUNT, Math.min(start.length, end.length) - 1);
+        int n = Math.min(MAX_SECTIONS, Math.min(start.length, end.length) - 1);
         if (n < 1) return;
+        if (n > sectionCount) sectionCount = clamp(n, MIN_SECTIONS, MAX_SECTIONS);
         firstClassStart = formatHm(start[1]);
         for (int i = 1; i <= n; i++) {
             Section s = section(i);
             s.durationMinutes = Math.max(1, end[i] - start[i]);
             if (i < n) s.breakAfterMinutes = Math.max(0, start[i + 1] - end[i]);
         }
+    }
+
+    public int sectionCount() {
+        return clamp(sectionCount, MIN_SECTIONS, MAX_SECTIONS);
+    }
+
+    public void setSectionCount(int n) {
+        sectionCount = clamp(n, MIN_SECTIONS, MAX_SECTIONS);
+    }
+
+    /**
+     * 导入的课表用到了更靠后的节次（比如第 12 节）时自动扩到那一节；只会变多不会变少。
+     * 返回是否改动。
+     */
+    public boolean ensureCovers(int maxSection) {
+        int want = clamp(maxSection, MIN_SECTIONS, MAX_SECTIONS);
+        if (want <= sectionCount()) return false;
+        normalizeSections();
+        // 原来最后一节后面没留课间的话，补一个默认 10 分钟，免得新加的节次贴着上一节
+        for (int i = sectionCount(); i < want; i++) {
+            Section prev = section(i);
+            if (prev.breakAfterMinutes == 0) prev.breakAfterMinutes = 10;
+        }
+        sectionCount = want;
+        return true;
+    }
+
+    /** 课表里用到的最大节次（没有课返回 0）。 */
+    public static int maxSectionUsed(com.ecut.campus.data.Timetable t) {
+        int max = 0;
+        if (t == null || t.courses == null) return 0;
+        for (com.ecut.campus.data.Timetable.Course c : t.courses) {
+            if (c.sessions == null) continue;
+            for (com.ecut.campus.data.Timetable.Session s : c.sessions) {
+                max = Math.max(max, Math.max(s.startSection, s.endSection));
+            }
+        }
+        return Math.min(MAX_SECTIONS, max);
     }
 
     public String rangeLabel(int sectionNumber) {
@@ -120,6 +165,7 @@ public final class ScheduleSettings {
         JSONObject o = new JSONObject();
         o.put("schemaVersion", SCHEMA_VERSION);
         o.put("firstClassStart", firstClassStart);
+        o.put("sectionCount", sectionCount());
         JSONArray arr = new JSONArray();
         for (Section s : sections) arr.put(s.toJson());
         o.put("sections", arr);
@@ -141,6 +187,7 @@ public final class ScheduleSettings {
 
         String first = o.optString("firstClassStart", DEFAULT_FIRST_CLASS_START);
         if (parseHm(first) >= 0) out.firstClassStart = first;
+        out.sectionCount = clamp(o.optInt("sectionCount", DEFAULT_SECTION_COUNT), MIN_SECTIONS, MAX_SECTIONS);
 
         JSONArray arr = o.optJSONArray("sections");
         if (arr != null) {
@@ -148,7 +195,7 @@ public final class ScheduleSettings {
                 JSONObject so = arr.optJSONObject(i);
                 if (so == null) continue;
                 int number = so.optInt("section", i + 1);
-                if (number < 1 || number > SECTION_COUNT) continue;
+                if (number < 1 || number > MAX_SECTIONS) continue;
                 Section s = out.sections.get(number - 1);
                 s.durationMinutes = clamp(so.optInt("durationMinutes", s.durationMinutes), 1, 300);
                 s.breakAfterMinutes = clamp(so.optInt("breakAfterMinutes", s.breakAfterMinutes), 0, 600);
@@ -179,12 +226,12 @@ public final class ScheduleSettings {
 
     private void normalizeSections() {
         if (sections == null) sections = new ArrayList<>();
-        while (sections.size() < SECTION_COUNT) {
+        while (sections.size() < MAX_SECTIONS) {
             int i = sections.size();
             sections.add(new Section(i + 1, DEFAULT_DURATIONS[i], DEFAULT_BREAKS[i]));
         }
-        if (sections.size() > SECTION_COUNT) {
-            sections = new ArrayList<>(sections.subList(0, SECTION_COUNT));
+        if (sections.size() > MAX_SECTIONS) {
+            sections = new ArrayList<>(sections.subList(0, MAX_SECTIONS));
         }
         for (int i = 0; i < sections.size(); i++) {
             Section s = sections.get(i);

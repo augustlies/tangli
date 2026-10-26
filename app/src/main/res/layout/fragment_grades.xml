@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/g_paper"
+    android:background="?attr/gBg"
     android:clipToPadding="false"
     android:paddingHorizontal="20dp"
     android:paddingTop="4dp"
@@ -28,7 +28,7 @@
                 android:layout_weight="1"
                 android:fontFamily="monospace"
                 android:text="GPA 与加权分仅供参考"
-                android:textColor="@color/g_mute"
+                android:textColor="?attr/gMute"
                 android:textSize="11.5sp" />
 
             <TextView
@@ -39,7 +39,7 @@
                 android:gravity="center"
                 android:paddingHorizontal="12dp"
                 android:text="↻ 同步"
-                android:textColor="@color/g_ink"
+                android:textColor="?attr/gInk"
                 android:textSize="12.5sp" />
         </LinearLayout>
 
@@ -60,7 +60,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="1px"
-            android:background="@color/g_hair" />
+            android:background="?attr/gHair" />
 
         <!-- 3. 读数区：GPA / 加权平均分 -->
         <LinearLayout
@@ -81,7 +81,7 @@
                     android:fontFamily="monospace"
                     android:letterSpacing="0.08"
                     android:text="GPA"
-                    android:textColor="@color/g_mute"
+                    android:textColor="?attr/gMute"
                     android:textSize="11sp" />
 
                 <TextView
@@ -91,7 +91,7 @@
                     android:fontFamily="monospace"
                     android:includeFontPadding="false"
                     android:text="0.00"
-                    android:textColor="@color/g_ink"
+                    android:textColor="?attr/gInk"
                     android:textSize="44sp"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -100,7 +100,7 @@
                 android:layout_width="1px"
                 android:layout_height="match_parent"
                 android:layout_marginHorizontal="16dp"
-                android:background="@color/g_hair" />
+                android:background="?attr/gHair" />
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -113,7 +113,7 @@
                     android:layout_height="wrap_content"
                     android:letterSpacing="0.04"
                     android:text="加权平均分"
-                    android:textColor="@color/g_mute"
+                    android:textColor="?attr/gMute"
                     android:textSize="11sp" />
 
                 <TextView
@@ -123,7 +123,7 @@
                     android:fontFamily="monospace"
                     android:includeFontPadding="false"
                     android:text="0.0"
-                    android:textColor="@color/g_ink"
+                    android:textColor="?attr/gInk"
                     android:textSize="44sp"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -143,7 +143,7 @@
                 android:layout_weight="1"
                 android:fontFamily="monospace"
                 android:text=""
-                android:textColor="@color/g_sub"
+                android:textColor="?attr/gSub"
                 android:textSize="12sp" />
 
             <TextView
@@ -152,7 +152,7 @@
                 android:layout_height="wrap_content"
                 android:fontFamily="monospace"
                 android:text="全部学期"
-                android:textColor="@color/g_mute"
+                android:textColor="?attr/gMute"
                 android:textSize="11sp" />
         </LinearLayout>
 
@@ -160,7 +160,7 @@
             android:layout_width="match_parent"
             android:layout_height="1px"
             android:layout_marginTop="18dp"
-            android:background="@color/g_ink" />
+            android:background="?attr/gInk" />
 
         <!-- 4. 空态 -->
         <LinearLayout
@@ -173,20 +173,22 @@
             android:visibility="gone">
 
             <TextView
+                android:id="@+id/tv_empty_grades_title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="暂无本地成绩档案"
-                android:textColor="@color/g_ink"
+                android:textColor="?attr/gInk"
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/tv_empty_grades_sub"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:gravity="center"
                 android:text="在设置页登录统一门户一次，之后点「↻ 同步」即可后台静默更新。"
-                android:textColor="@color/g_sub"
+                android:textColor="?attr/gSub"
                 android:textSize="13sp" />
 
             <LinearLayout
@@ -203,7 +205,7 @@
                     android:gravity="center"
                     android:paddingHorizontal="18dp"
                     android:text="同步成绩"
-                    android:textColor="@color/g_card"
+                    android:textColor="?attr/gCard"
                     android:textSize="13sp" />
 
                 <TextView
@@ -216,7 +218,7 @@
                     android:gravity="center"
                     android:paddingHorizontal="16dp"
                     android:text="载入样本体验"
-                    android:textColor="@color/g_ink"
+                    android:textColor="?attr/gInk"
                     android:textSize="13sp" />
             </LinearLayout>
         </LinearLayout>
