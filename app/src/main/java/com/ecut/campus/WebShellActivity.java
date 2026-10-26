@@ -29,8 +29,17 @@ import com.google.android.material.color.DynamicColors;
 import com.ecut.campus.data.Grades;
 import com.ecut.campus.data.GradesStore;
 import com.ecut.campus.data.JwglxtFetcher;
+import com.ecut.campus.data.PageSample;
+import com.ecut.campus.data.SchoolProfile;
+import com.ecut.campus.data.SemesterArchive;
+import com.ecut.campus.data.SyncDiff;
+import com.ecut.campus.data.TermStartProbe;
+import com.ecut.campus.data.QiangzhiGrades;
 import com.ecut.campus.data.Timetable;
+import com.ecut.campus.data.TimetableSource;
+import com.ecut.campus.data.TimetableSources;
 import com.ecut.campus.data.TimetableStore;
+import com.ecut.campus.data.ZhengfangSource;
 
 import org.json.JSONTokener;
 
@@ -76,6 +85,9 @@ public class WebShellActivity extends AppCompatActivity {
     private boolean syncedTimetableOnce = false;
     private boolean syncedGradesOnce = false;
     private boolean openingEhallTarget = false;
+    /** 当前学校。东华理工保持原有的门户 / 办事大厅流程。 */
+    private SchoolProfile school;
+    private boolean importing = false;
 
     /** 匹配 aTrust 代理主机：172-20-130-13.atrust.ecut.edu.cn */
     private static final Pattern PROXY_HOST = Pattern.compile(
@@ -92,6 +104,7 @@ public class WebShellActivity extends AppCompatActivity {
         progress = findViewById(R.id.progress);
         webTitle = findViewById(R.id.web_title);
         toggleFitBtn = findViewById(R.id.btn_toggle_fit);
+        school = Schools.current(this);
 
         resolveTarget();
         if (webTitle != null) webTitle.setText(title);
@@ -130,6 +143,14 @@ public class WebShellActivity extends AppCompatActivity {
             });
         }
 
+        View importBtn = findViewById(R.id.btn_import_page);
+        if (importBtn != null) {
+            // 其他学校没有静默同步：教务页底部常驻「导入此页课表」
+            boolean show = !school.isEcut() && !getIntent().hasExtra(EXTRA_TITLE);
+            importBtn.setVisibility(show ? View.VISIBLE : View.GONE);
+            importBtn.setOnClickListener(v -> importThisPage());
+        }
+
         configureWebView();
         route();
     }
@@ -143,6 +164,10 @@ public class WebShellActivity extends AppCompatActivity {
             return;
         }
         String key = getIntent().getStringExtra(EXTRA_TARGET_KEY);
+        if (!school.isEcut()) {
+            resolveOtherSchoolTarget(key);
+            return;
+        }
         autoOpenTimetable = "timetable".equals(key);
         List<TargetStore.Target> all = TargetStore.load(this);
         TargetStore.Target found = null;
@@ -157,6 +182,22 @@ public class WebShellActivity extends AppCompatActivity {
             targetPath = DEFAULT_PORTAL;
             title = "应用中心";
         }
+    }
+
+    /** 其他学校：课表 / 成绩直达本校教务，其余入口打开登录页。 */
+    private void resolveOtherSchoolTarget(String key) {
+        autoOpenTimetable = false;
+        title = school.name == null || school.name.isEmpty() ? "教务" : school.name;
+        TimetableSource src = Schools.source(school);
+        String url = null;
+        if ("timetable".equals(key) && src != null) url = src.timetableUrl(school);
+        if ("grades".equals(key) && school.supportsGrades()) {
+            url = school.vendor == SchoolProfile.Vendor.QIANGZHI
+                    ? QiangzhiGrades.gradesUrl(school) : ZhengfangSource.gradesUrl(school);
+        }
+        if (url == null || !Prefs.hasPortalSession(this)) url = school.loginUrl;
+        if (url == null || url.isEmpty()) url = school.jwBase;
+        targetPath = url;
     }
 
     private boolean isJwglxtLoginPage(String url) {
@@ -185,7 +226,7 @@ public class WebShellActivity extends AppCompatActivity {
 
     /** 只允许校内门户与正方教务相关域名，阻断无关外链 */
     private boolean isAllowedCampusUrl(String url) {
-        return CampusUrlPolicy.isAllowedCampusUrl(url);
+        return CampusUrlPolicy.isAllowedFor(school, url);
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -211,6 +252,7 @@ public class WebShellActivity extends AppCompatActivity {
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 progress.setVisibility(View.VISIBLE);
                 progress.setProgress(0);
+                if (!school.isEcut()) return;
                 maybeCaptureHost(url);
                 if (isJwglxtLoginPage(url)) {
                     Prefs.setPortalSession(WebShellActivity.this, false);
@@ -221,6 +263,10 @@ public class WebShellActivity extends AppCompatActivity {
             public void onPageFinished(WebView view, String url) {
                 progress.setVisibility(View.GONE);
                 Log.i(TAG, "PAGE URL: " + url);
+                if (!school.isEcut()) {
+                    onOtherSchoolPageFinished(view, url);
+                    return;
+                }
                 if (isJwglxtPage(url)) {
                     applyMobileAdaptation(view);
                     rememberPortalSession(url);
@@ -273,7 +319,7 @@ public class WebShellActivity extends AppCompatActivity {
                     Toast.makeText(WebShellActivity.this, "已拦截非教务外链", Toast.LENGTH_SHORT).show();
                     return true;
                 }
-                maybeCaptureHost(url);
+                if (school.isEcut()) maybeCaptureHost(url);
                 if (!url.equals(request.getUrl().toString())) {
                     view.loadUrl(url);
                     return true;
@@ -452,6 +498,191 @@ public class WebShellActivity extends AppCompatActivity {
                 Log.w(TAG, "Timetable parse empty or warning: " + res.warnings);
             }
         });
+    }
+
+    // ==================== 其他学校：导入此页课表 ====================
+
+    private void onOtherSchoolPageFinished(WebView view, String url) {
+        TimetableSource src = Schools.source(school);
+        if (src == null || url == null) return;
+        if (src.isLoggedInPage(url)) {
+            Prefs.setPortalSession(this, true);
+            Prefs.setSessionExpired(this, false);
+            CookieManager.getInstance().flush();
+            if (school.vendor == SchoolProfile.Vendor.ZHENGFANG) applyMobileAdaptation(view);
+        }
+    }
+
+    /** 认出当前页面是哪家教务 → 取课表 → 预览确认后写入。 */
+    private void importThisPage() {
+        if (webView == null || importing) return;
+        importing = true;
+        String js = "(function(){try{" +
+                "var h=document.documentElement?document.documentElement.outerHTML:'';h=h.substring(0,200000);" +
+                "for(var f=0;f<window.frames.length;f++){try{var d=window.frames[f].document;" +
+                "h+='\\n'+d.documentElement.outerHTML.substring(0,200000);}catch(e){}}" +
+                "return h;}catch(e){return '';}})()";
+        webView.evaluateJavascript(js, raw -> {
+            if (webView == null) { importing = false; return; }
+            String html = unwrapJsString(raw);
+            String url = webView.getUrl();
+            TimetableSource src = TimetableSources.detect(url, html);
+            if (src == null && school.allowsUrl(url)) src = Schools.source(school);
+            DiagLog.log(this, "import", "导入此页: 识别=" + (src == null ? "无" : src.vendor().key())
+                    + " · " + school.diagSummary() + " · path=" + pathOnly(url));
+            if (src == null) {
+                importing = false;
+                showUnsupported(null);
+                return;
+            }
+            runImport(src, url);
+        });
+    }
+
+    private void runImport(TimetableSource src, String pageUrl) {
+        Toast.makeText(this, "正在读取" + src.vendor().label + "教务的课表…", Toast.LENGTH_SHORT).show();
+        webView.evaluateJavascript(src.extractionJs(school, null, null), raw -> {
+            importing = false;
+            if (webView == null || isFinishing()) return;
+            String text = unwrapJsString(raw);
+            JwglxtFetcher.Result res = (text == null || text.isEmpty() || text.startsWith("ERR:"))
+                    ? new JwglxtFetcher.Result() : src.parse(text);
+            if (src.vendor() == SchoolProfile.Vendor.ZHENGFANG && res.ok()) {
+                DiagLog.saveKbList(this, text);
+            }
+            DiagLog.log(this, "import", "解析(" + src.vendor().key() + "): 学期=" + res.timetable.semester.id
+                    + " 原始=" + res.rawRecords + " 课程=" + res.courseCount
+                    + " 周次失败=" + res.failedWeekExpr
+                    + (res.warnings.isEmpty() ? "" : " " + res.warnings));
+            if (!res.ok()) {
+                showUnsupported("认出这是" + src.vendor().label + "教务，但这一页没有读到课表。\n\n"
+                        + "请先在教务里打开「我的课表」（学期课表）页面，再点「导入此页课表」。");
+                return;
+            }
+            probeTermStart(src, res, () -> showImportPreview(src, res, pageUrl));
+        });
+    }
+
+    /** 非东华理工、还没开学日期时，从教务推出第 1 周周一（强智教学周历 / 页面「当前第 N 周」）。 */
+    private void probeTermStart(TimetableSource src, JwglxtFetcher.Result res, Runnable next) {
+        String have = res.timetable.semester.startDate;
+        if (school.isEcut() || (have != null && !have.isEmpty())) { next.run(); return; }
+        webView.evaluateJavascript(TermStartProbe.probeJs(src.vendor(), res.timetable.semester.id), raw -> {
+            if (webView == null || isFinishing()) return;
+            String monday = TermStartProbe.detect(unwrapJsString(raw), WeekMath.todayDateLabel());
+            DiagLog.log(this, "import", "开学日探测: " + (monday.isEmpty() ? "没找到" : monday));
+            if (!monday.isEmpty()) res.timetable.semester.startDate = monday;
+            next.run();
+        });
+    }
+
+    private void showImportPreview(TimetableSource src, JwglxtFetcher.Result res, String pageUrl) {
+        Timetable current = TimetableStore.load(this);
+        String semId = res.timetable.semester.id;
+        // 页面上是别的学期（不是当前学期）：合并进归档里的那个学期，不能写进当前学期。
+        boolean otherSemester = semId != null && !semId.isEmpty()
+                && current.semester.id != null && !current.semester.id.isEmpty()
+                && !semId.equals(current.semester.id);
+        Timetable archived = otherSemester ? SemesterArchive.loadSemester(this, semId) : null;
+        Timetable before = otherSemester ? (archived != null ? archived : new Timetable()) : current;
+        Timetable merged = TimetableStore.merge(before, res.timetable);
+        String diff = SyncDiff.summarize(before, merged);
+        StringBuilder msg = new StringBuilder();
+        msg.append("识别为：").append(src.vendor().label).append("教务\n");
+        String semName = res.timetable.semester.name;
+        msg.append("学期：").append(semName == null || semName.isEmpty() ? "没认出来（沿用当前学期）" : semName).append('\n');
+        msg.append("共 ").append(res.courseCount).append(" 门课：");
+        int shown = 0;
+        for (Timetable.Course c : res.timetable.courses) {
+            if (shown == 12) { msg.append(" 等"); break; }
+            if (shown > 0) msg.append("、");
+            msg.append(c.name);
+            shown++;
+        }
+        if (res.failedWeekExpr > 0) {
+            msg.append("\n\n有 ").append(res.failedWeekExpr).append(" 处上课周没认出来，导入后请核对。");
+        }
+        if (diff != null && !diff.isEmpty()) msg.append("\n\n和现在的课表相比：\n").append(diff);
+        String start = merged.semester.startDate;
+        if (!school.isEcut()) {
+            msg.append("\n\n第 1 周周一：").append(start == null || start.isEmpty()
+                    ? "没从教务读到，导入后请在课表设置里选一下" : start);
+        }
+        if (otherSemester) msg.append("\n\n这不是当前学期，会存到历史学期里，当前课表不变。");
+        msg.append("\n\n导入会替换之前从教务导入的课程，你自己添加的课程会保留。");
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("导入这份课表？")
+                .setMessage(msg.toString())
+                .setNegativeButton("取消", null)
+                .setPositiveButton("导入", (d, w) -> {
+                    boolean saved = otherSemester
+                            ? SemesterArchive.saveSemester(this, merged, false)
+                            : TimetableStore.save(this, merged);
+                    if (!saved) {
+                        Toast.makeText(this, "课表写入本地失败", Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    SemesterArchive.unifyColors(this);
+                    Prefs.setLastSyncTime(this, new SimpleDateFormat("MM-dd HH:mm", Locale.US).format(new Date()));
+                    Prefs.setTimetableSyncedAt(this, System.currentTimeMillis());
+                    Prefs.setPortalSession(this, true);
+                    Prefs.setSessionExpired(this, false);
+                    rememberDetectedVendor(src, pageUrl);
+                    DiagLog.log(this, "import", "已导入 " + merged.courses.size() + " 门");
+                    Toast.makeText(this, "已导入 " + res.courseCount + " 门课", Toast.LENGTH_SHORT).show();
+                })
+                .show();
+    }
+
+    /** 自定义学校原本没认出厂商：导入成功后记下来，以后就能后台同步。 */
+    private void rememberDetectedVendor(TimetableSource src, String pageUrl) {
+        if (!school.isCustom() || school.vendor != SchoolProfile.Vendor.OTHER) return;
+        SchoolProfile upgraded = SchoolProfile.custom(pageUrl, src.vendor());
+        if (upgraded == null) return;
+        upgraded.loginUrl = school.loginUrl;
+        upgraded.name = school.name;
+        for (String h : school.hosts) if (!upgraded.hosts.contains(h)) upgraded.hosts.add(h);
+        Prefs.setCustomSchoolJson(this, upgraded.toJson().toString());
+        school = upgraded;
+        DiagLog.log(this, "school", "自定义学校识别为 " + upgraded.diagSummary());
+    }
+
+    private void showUnsupported(String detail) {
+        if (isFinishing()) return;
+        String msg = (detail != null ? detail + "\n\n" : "烫梨还读不了这个页面的课表。\n\n")
+                + "可以导出一份「页面结构样本」帮忙适配你的学校：只记网页用了哪些标签和字段名，"
+                + "不含姓名、学号等文字，会附在诊断日志里一起分享。";
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle(detail != null ? "没读到课表" : "暂不支持这个教务系统")
+                .setMessage(msg)
+                .setNegativeButton("关闭", null)
+                .setPositiveButton("导出结构样本", (d, w) -> exportPageSample())
+                .show();
+    }
+
+    private void exportPageSample() {
+        if (webView == null) return;
+        webView.evaluateJavascript(PageSample.collectJs(), raw -> {
+            String sample = PageSample.sanitize(unwrapJsString(raw));
+            if (sample.isEmpty()) {
+                Toast.makeText(this, "没能读取页面结构", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            DiagLog.savePageSample(this, sample);
+            DiagLog.log(this, "import", "已保存页面结构样本 " + sample.length() + " 字 · " + school.diagSummary());
+            DiagLog.export(this);
+        });
+    }
+
+    /** 只留路径，不带查询参数（可能有 ticket）。 */
+    static String pathOnly(String url) {
+        if (url == null) return "";
+        try {
+            String p = java.net.URI.create(url).getRawPath();
+            return p == null ? "" : p;
+        } catch (IllegalArgumentException e) {
+            return "";
+        }
     }
 
     /** 将 evaluateJavascript 返回的 JSON 编码字符串还原为原始字符串 */

@@ -5,11 +5,12 @@
     android:id="@+id/settings_scroll"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/g_paper"
+    android:background="?attr/gBg"
     android:clipToPadding="false"
     android:paddingHorizontal="18dp"
     android:paddingTop="16dp"
-    android:paddingBottom="76dp">
+    android:paddingBottom="92dp"
+    android:overScrollMode="never">
 
 <FrameLayout
     android:layout_width="match_parent"
@@ -32,11 +33,63 @@
             android:layout_marginTop="2dp"
             android:fontFamily="monospace"
             android:text=""
-            android:textColor="@color/g_sub"
+            android:textColor="?attr/gSub"
             android:textSize="12sp" />
 
         <TextView
-            style="@style/G.SectionLabel"
+            style="@style/G.SectionLabel.Tight"
+            android:text="SCHOOL · 学校" />
+        <com.google.android.material.card.MaterialCardView
+            style="@style/G.Card">
+
+            <LinearLayout
+                android:id="@+id/row_settings_school"
+                style="@style/G.Row.Tight">
+
+                <FrameLayout
+                    android:layout_width="30dp"
+                    android:layout_height="wrap_content">
+
+                    <TextView
+                        android:id="@+id/tv_settings_school_index"
+                        style="@style/G.RowIndex"
+                        android:text="00" />
+
+                    <ImageView
+                        android:id="@+id/iv_settings_school_badge"
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_gravity="center_vertical"
+                        android:contentDescription="校徽"
+                        android:scaleType="fitCenter"
+                        android:visibility="gone" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        style="@style/G.RowTitle"
+                        android:text="学校" />
+
+                    <TextView
+                        android:id="@+id/tv_settings_school_sub"
+                        style="@style/G.RowSub"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="东华理工大学" />
+                </LinearLayout>
+
+                <TextView
+                    style="@style/G.RowChevron" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            style="@style/G.SectionLabel.Tight"
             android:text="ACCOUNT · 账号" />
         <com.google.android.material.card.MaterialCardView
             style="@style/G.Card">
@@ -45,7 +98,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="18dp">
+                android:paddingHorizontal="18dp"
+                android:paddingVertical="14dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -58,7 +112,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="教务账号"
-                        android:textColor="@color/g_ink"
+                        android:textColor="?attr/gInk"
                         android:textSize="16sp"
                         android:textStyle="bold" />
 
@@ -69,7 +123,7 @@
                         android:fontFamily="monospace"
                         android:paddingVertical="3dp"
                         android:text="○ 待连接"
-                        android:textColor="@color/g_mute"
+                        android:textColor="?attr/gMute"
                         android:textSize="11sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -80,20 +134,20 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
                     android:text="首次使用请登录统一门户；之后课表与成绩可静默更新"
-                    android:textColor="@color/g_sub"
+                    android:textColor="?attr/gSub"
                     android:textSize="12.5sp" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
+                    android:layout_marginTop="12dp"
                     android:orientation="horizontal">
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_settings_sync_now"
                         style="@style/Gauge.Button"
                         android:layout_width="0dp"
-                        android:layout_height="42dp"
+                        android:layout_height="40dp"
                         android:layout_weight="1"
                         android:text="同步课表"
                         android:textSize="12.5sp" />
@@ -102,7 +156,7 @@
                         android:id="@+id/btn_settings_open_portal"
                         style="@style/Gauge.Button.Outline"
                         android:layout_width="0dp"
-                        android:layout_height="42dp"
+                        android:layout_height="40dp"
                         android:layout_weight="1"
                         android:layout_marginStart="10dp"
                         android:text="登录统一门户"
@@ -113,7 +167,7 @@
         </com.google.android.material.card.MaterialCardView>
 
         <TextView
-            style="@style/G.SectionLabel"
+            style="@style/G.SectionLabel.Tight"
             android:text="ENTRIES · 入口" />
         <com.google.android.material.card.MaterialCardView
             style="@style/G.Card">
@@ -125,7 +179,7 @@
 
             <LinearLayout
                 android:id="@+id/card_settings_grades"
-                style="@style/G.Row">
+                style="@style/G.Row.Tight">
 
                 <TextView
                     style="@style/G.RowIndex"
@@ -152,11 +206,13 @@
                     style="@style/G.RowChevron" />
             </LinearLayout>
 
-            <View style="@style/G.Hair" />
+            <View
+                android:id="@+id/hair_settings_campus"
+                style="@style/G.Hair" />
 
             <LinearLayout
                 android:id="@+id/row_settings_campus"
-                style="@style/G.Row">
+                style="@style/G.Row.Tight">
 
                 <TextView
                     style="@style/G.RowIndex"
@@ -185,7 +241,7 @@
 
             <LinearLayout
                 android:id="@+id/row_settings_classmates"
-                style="@style/G.Row">
+                style="@style/G.Row.Tight">
 
                 <TextView
                     style="@style/G.RowIndex"
@@ -214,7 +270,7 @@
 
             <LinearLayout
                 android:id="@+id/row_settings_timetable_page"
-                style="@style/G.Row">
+                style="@style/G.Row.Tight">
 
                 <TextView
                     style="@style/G.RowIndex"
@@ -244,7 +300,7 @@
 
             <LinearLayout
                 android:id="@+id/row_settings_general_page"
-                style="@style/G.Row">
+                style="@style/G.Row.Tight">
 
                 <TextView
                     style="@style/G.RowIndex"
@@ -289,7 +345,7 @@
             android:paddingHorizontal="6dp"
             android:fontFamily="monospace"
             android:text="‹ 设置"
-            android:textColor="@color/g_sub"
+            android:textColor="?attr/gSub"
             android:textSize="13sp" />
 
         <TextView
@@ -302,7 +358,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:text="课表怎么显示、几点上课、数据进出"
-            android:textColor="@color/g_sub"
+            android:textColor="?attr/gSub"
             android:textSize="12.5sp" />
         <TextView
             style="@style/G.SectionLabel"
@@ -415,7 +471,7 @@
                     android:layout_height="wrap_content"
                     android:fontFamily="monospace"
                     android:text="ICS"
-                    android:textColor="@color/g_mute"
+                    android:textColor="?attr/gMute"
                     android:textSize="11sp" />
             </LinearLayout>
 
@@ -450,7 +506,7 @@
                     android:layout_height="wrap_content"
                     android:fontFamily="monospace"
                     android:text="JSON"
-                    android:textColor="@color/g_mute"
+                    android:textColor="?attr/gMute"
                     android:textSize="11sp" />
             </LinearLayout>
 
@@ -485,7 +541,7 @@
                     android:layout_height="wrap_content"
                     android:fontFamily="monospace"
                     android:text="JSON"
-                    android:textColor="@color/g_mute"
+                    android:textColor="?attr/gMute"
                     android:textSize="11sp" />
             </LinearLayout>
             </LinearLayout>
@@ -509,7 +565,7 @@
             android:paddingHorizontal="6dp"
             android:fontFamily="monospace"
             android:text="‹ 设置"
-            android:textColor="@color/g_sub"
+            android:textColor="?attr/gSub"
             android:textSize="13sp" />
 
         <TextView
@@ -522,7 +578,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:text="外观、本地数据与高级选项"
-            android:textColor="@color/g_sub"
+            android:textColor="?attr/gSub"
             android:textSize="12.5sp" />
         <TextView
             style="@style/G.SectionLabel"
@@ -535,6 +591,18 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="18dp">
+
+                <TextView
+                    style="@style/G.RowTitle"
+                    android:text="主题" />
+
+                <LinearLayout
+                    android:id="@+id/seg_theme"
+                    android:layout_width="match_parent"
+                    android:layout_height="38dp"
+                    android:layout_marginTop="12dp"
+                    android:layout_marginBottom="18dp"
+                    android:orientation="horizontal" />
 
                 <TextView
                     style="@style/G.RowTitle"
@@ -610,7 +678,7 @@
                     android:layout_height="wrap_content"
                     android:fontFamily="monospace"
                     android:text="本地课表：0 门  ·  成绩：0 门"
-                    android:textColor="@color/g_sub"
+                    android:textColor="?attr/gSub"
                     android:textSize="12.5sp" />
 
                 <LinearLayout
@@ -637,7 +705,7 @@
                         android:layout_weight="1"
                         android:layout_marginStart="10dp"
                         android:text="清空本地数据"
-                        android:textColor="@color/g_accent"
+                        android:textColor="?attr/gAccent"
                         android:textSize="12.5sp" />
                 </LinearLayout>
 
@@ -733,7 +801,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:fontFamily="monospace"
-                    android:textColor="@color/g_ink"
+                    android:textColor="?attr/gInk"
                     android:textSize="14sp"
                     android:textStyle="bold"
                     tools:text="烫梨 · v0.4" />
@@ -743,7 +811,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:text="非官方校园工具。教务数据以学校系统为准，成绩计算仅供参考。不保存任何账号密码。"
-                    android:textColor="@color/g_mute"
+                    android:textColor="?attr/gMute"
                     android:textSize="12sp" />
 
                 <TextView
@@ -754,7 +822,7 @@
                     android:background="?attr/selectableItemBackground"
                     android:paddingVertical="4dp"
                     android:text="★ 觉得好用？去 GitHub 点个 Star，让更多同学找到它"
-                    android:textColor="@color/g_ink"
+                    android:textColor="?attr/gInk"
                     android:textSize="12sp" />
 
                 <TextView
@@ -764,7 +832,7 @@
                     android:layout_marginTop="12dp"
                     android:fontFamily="monospace"
                     android:text="项目主页 · 检查更新 · 问题反馈  ›"
-                    android:textColor="@color/g_ink"
+                    android:textColor="?attr/gInk"
                     android:textSize="12sp" />
 
             </LinearLayout>
