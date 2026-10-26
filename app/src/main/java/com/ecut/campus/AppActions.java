@@ -147,6 +147,12 @@ final class AppActions {
     }
 
     private static void open(Activity a, String what) {
+        if (("mail".equals(what) || "library".equals(what) || "calendar".equals(what) || "map".equals(what))
+                && !Schools.current(a).ecutFeatures) {
+            android.widget.Toast.makeText(a, "这个功能只适用于东华理工大学",
+                    android.widget.Toast.LENGTH_SHORT).show();
+            return;
+        }
         Class<?> target = null;
         switch (what) {
             case "mail": CampusLinks.openMail(a); return;
