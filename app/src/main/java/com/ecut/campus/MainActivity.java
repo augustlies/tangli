@@ -29,6 +29,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.ecut.campus.data.Grades;
 import com.ecut.campus.data.GradesStore;
 import com.ecut.campus.data.IcsExporter;
+import com.ecut.campus.data.SchoolProfile;
 import com.ecut.campus.data.SemesterArchive;
 import com.ecut.campus.data.Timetable;
 import com.ecut.campus.data.TimetableStore;
@@ -65,15 +66,12 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
     private Timetable currentTimetable = new Timetable();
     private ScheduleSettings scheduleSettings = ScheduleSettings.createDefault();
 
-    private TextView dockTimetable;
-    private TextView dockAdblock;
-    private TextView dockSettings;
-    private View textDock;
+    private CapsuleDock textDock;
     private DockBlurView dockBlur;
     private TextView statusText;
     private TextView statusSubtext;
     private TextView shieldBadge;
-    private com.google.android.material.button.MaterialButton toggleBtn;
+    private com.ecut.campus.view.ShieldRingView toggleBtn;
     private MaterialCardView adblockHeroCard;
     private ViewGroup syncHost;
     private CampusSyncClient activeSync;
@@ -94,22 +92,29 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
         campusFragment = inflater.inflate(R.layout.fragment_campus, container, false);
         container.addView(campusFragment);
 
-        dockTimetable = findViewById(R.id.dock_timetable);
-        dockAdblock = findViewById(R.id.dock_adblock);
-        dockSettings = findViewById(R.id.dock_settings);
         textDock = findViewById(R.id.text_dock);
         dockBlur = findViewById(R.id.dock_blur);
-        if (dockBlur != null) dockBlur.setSource(container);
-
-        dockTimetable.setOnClickListener(v -> showTab(TAB_TIMETABLE));
-        dockAdblock.setOnClickListener(v -> showTab(TAB_ADBLOCK));
-        dockSettings.setOnClickListener(v -> showTab(TAB_SETTINGS));
+        if (dockBlur != null) {
+            // 纸墨的胶囊是实心墨色，用不着模糊层
+            if (G.GLASS) dockBlur.setSource(container);
+            else dockBlur.setVisibility(View.GONE);
+        }
+        textDock.setOnTabSelectedListener(this::showTab);
+        // 在课表页再点一次「课表」：回到本周（看别的周看迷路时最顺手的出口）
+        textDock.setOnTabReselectedListener(tab -> {
+            if (tab != TAB_TIMETABLE) return;
+            int actual = actualCurrentWeek();
+            if (Prefs.currentWeek(this) == actual) return;
+            Prefs.setCurrentWeek(this, actual);
+            refreshTimetableTab();
+            Toast.makeText(this, "已回到本周（第 " + actual + " 周）", Toast.LENGTH_SHORT).show();
+        });
 
         bindTimetableTab();
         runStartupMigrationsOnce();
 
         textDock.post(() -> {
-            if (timetableView != null) timetableView.setBottomInset(textDock.getHeight());
+            if (timetableView != null) timetableView.setBottomInset(dockInset());
         });
 
         // 冷启动直接定位到现实中的本周，onResume 就不必再刷一遍
@@ -120,6 +125,14 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
         }
         showTab(TAB_TIMETABLE);
         skipNextResumeRefresh = true;
+        if (ThemeReveal.restoreTab >= 0) {
+            int tab = ThemeReveal.restoreTab, page = ThemeReveal.restorePage;
+            ThemeReveal.restoreTab = -1;
+            ThemeReveal.restorePage = -1;
+            showTab(tab);
+            if (tab == TAB_SETTINGS && page > 0 && page != R.id.settings_page_root) showSettingsPage(page);
+        }
+        ThemeReveal.play(this);
         // 首帧画完再去查更新（联网 + 可能弹窗），不挡冷启动
         container.postDelayed(() -> {
             if (!isFinishing()) Updater.autoCheck(this);
@@ -168,6 +181,10 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
         } else if ("open".equals(action)) {
             if ("settings".equals(value)) showTab(TAB_SETTINGS);
             else if ("adblock".equals(value)) showTab(TAB_ADBLOCK);
+        } else if ("dns".equals(action) && "start".equals(value)) {
+            // 快捷开关 / 暂停结束通知：没授权的话在这里补授权
+            showTab(TAB_ADBLOCK);
+            if (!DnsFilterService.isRunning) prepareAndStartVpn();
         }
     }
 
@@ -222,6 +239,15 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
         bindSettings();
     }
 
+    /** 第一次看到有课的课表时，提示一次「长按空白处画课」。 */
+    private void maybeShowDrawTip(com.ecut.campus.data.Timetable t) {
+        if (t == null || t.courses.isEmpty()) return;
+        android.content.SharedPreferences sp = getSharedPreferences(STARTUP_PREFS, MODE_PRIVATE);
+        if (sp.getBoolean("tip_draw_course", false)) return;
+        sp.edit().putBoolean("tip_draw_course", true).apply();
+        Toast.makeText(this, "小技巧：长按空白格子再上下拖，可以直接画一节课", Toast.LENGTH_LONG).show();
+    }
+
     private void showTab(int tab) {
         currentTab = tab;
         if (tab == TAB_ADBLOCK) ensureAdblockTab();
@@ -230,9 +256,7 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
         if (adblockFragment != null) adblockFragment.setVisibility(tab == TAB_ADBLOCK ? View.VISIBLE : View.GONE);
         if (settingsFragment != null) settingsFragment.setVisibility(tab == TAB_SETTINGS ? View.VISIBLE : View.GONE);
 
-        styleDockItem(dockTimetable, tab == TAB_TIMETABLE);
-        styleDockItem(dockAdblock, tab == TAB_ADBLOCK);
-        styleDockItem(dockSettings, tab == TAB_SETTINGS);
+        if (textDock != null && textDock.selectedTab() != tab) textDock.setSelected(tab, true);
         if (dockBlur != null) dockBlur.markDirty();
 
         if (tab == TAB_TIMETABLE) refreshTimetableTab();
@@ -240,9 +264,12 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
         else refreshSettingsTab();
     }
 
-    private void styleDockItem(TextView tv, boolean selected) {
-        tv.setTextColor(selected ? G.INK : G.MUTE);
-        tv.setTypeface(selected ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+    /** 悬浮 Dock 占掉的底部高度（胶囊高 + 离底边距 + 一点呼吸空间）。 */
+    private int dockInset() {
+        if (textDock == null || textDock.getHeight() == 0) return 0;
+        android.view.ViewGroup.MarginLayoutParams lp =
+                (android.view.ViewGroup.MarginLayoutParams) textDock.getLayoutParams();
+        return textDock.getHeight() + lp.bottomMargin + Math.round(6 * getResources().getDisplayMetrics().density);
     }
 
     // ==================== 课表 ====================
@@ -260,6 +287,21 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
                 @Override
                 public void onEmptySlotClick(int dayOfWeek, int startSection) {
                     openCourseEditor(null, dayOfWeek, startSection);
+                }
+
+                @Override
+                public void onEmptyRangeDrawn(int dayOfWeek, int startSection, int endSection) {
+                    Intent i = new Intent(MainActivity.this, CourseEditActivity.class);
+                    i.putExtra(CourseEditActivity.EXTRA_DEFAULT_DAY, dayOfWeek);
+                    i.putExtra(CourseEditActivity.EXTRA_DEFAULT_SECTION, startSection);
+                    i.putExtra(CourseEditActivity.EXTRA_DEFAULT_END_SECTION, endSection);
+                    i.putExtra(CourseEditActivity.EXTRA_CURRENT_WEEK, currentViewedWeek());
+                    startActivity(i);
+                }
+
+                @Override
+                public void onHint(String message) {
+                    Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
                 }
 
                 @Override
@@ -295,6 +337,24 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
             timetableView.setOnVerticalScrollListener(() -> {
                 if (dockBlur != null) dockBlur.markDirty();
             });
+        }
+
+        TextView scrubTitle = campusFragment.findViewById(R.id.tv_week_title);
+        if (scrubTitle != null) {
+            scrubTitle.setOnTouchListener(new WeekScrubber(scrubTitle, new WeekScrubber.Host() {
+                @Override public int viewedWeek() { return currentViewedWeek(); }
+                @Override public int actualWeek() { return actualCurrentWeek(); }
+                @Override public int totalWeeks() { return Prefs.totalWeeks(MainActivity.this); }
+                @Override public void previewWeek(int week) {
+                    scrubTitle.setText(gaugeWeekTitle(week, Prefs.totalWeeks(MainActivity.this)));
+                    if (timetableView != null) timetableView.setCurrentWeek(week);
+                }
+                @Override public void commitWeek(int week) {
+                    Prefs.setCurrentWeek(MainActivity.this, week);
+                    refreshTimetableTab();
+                }
+                @Override public void onTitleClick(View v) { showWeekMenu(v); }
+            }));
         }
 
         View backToCurrent = campusFragment.findViewById(R.id.btn_back_to_current_week);
@@ -360,7 +420,7 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
                 }));
     }
 
-    private android.app.AlertDialog dialog;
+    private androidx.appcompat.app.AlertDialog dialog;
 
     private FlowLayout semesterFlow;
     private TextView pickerHint;
@@ -379,7 +439,7 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
         draggingSemesterId = null;
         dragMoved = false;
 
-        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        androidx.appcompat.app.AlertDialog.Builder builder = new androidx.appcompat.app.AlertDialog.Builder(this);
         builder.setTitle("选择学期");
 
         LinearLayout content = new LinearLayout(this);
@@ -426,7 +486,7 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
     /** 旋钮选周：竖向拖动刻度盘，中央指针所指周即选中；底部按钮确认或回本周。 */
     private void showWeekPicker(int current, int total) {
         if (dialog != null && dialog.isShowing()) dialog.dismiss();
-        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        androidx.appcompat.app.AlertDialog.Builder builder = new androidx.appcompat.app.AlertDialog.Builder(this);
         float d = getResources().getDisplayMetrics().density;
         int pad = Math.round(16 * d);
 
@@ -448,10 +508,10 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
         ok.setText("跳转到第 " + current + " 周");
         ok.setTextSize(13.5f);
         ok.setTypeface(Typeface.DEFAULT_BOLD);
-        ok.setTextColor(G.CARD);
+        ok.setTextColor(G.ON_INK);
         ok.setGravity(android.view.Gravity.CENTER);
         GradientDrawable okBg = new GradientDrawable();
-        okBg.setCornerRadius(6 * d);
+        okBg.setCornerRadius(G.SMALL_RADIUS * d);
         okBg.setColor(G.INK);
         ok.setBackground(okBg);
         ok.setOnClickListener(v -> {
@@ -675,7 +735,7 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
         input.setHint("如 2025-2026 学年第1学期");
         int pad = Math.round(24 * getResources().getDisplayMetrics().density);
         input.setPadding(pad, pad / 2, pad, pad / 2);
-        new android.app.AlertDialog.Builder(this)
+        new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("新建学期课表")
                 .setMessage("学期第一周默认为今天，可稍后在「课表设置」修改。")
                 .setView(input)
@@ -711,7 +771,7 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
         int month = cal.get(java.util.Calendar.MONTH) + 1;
         int currentFallYear = month >= 7 ? thisYear : thisYear - 1;
 
-        new android.app.AlertDialog.Builder(this)
+        new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("同步历史学期课表")
                 .setMessage("将按成绩记录从 " + startYear + " 年级第一学期拉到当前学期，"
                         + "每个学期单独请求教务接口并写入归档，当前学期不受影响。")
@@ -793,9 +853,9 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
                         if (needRelogin) {
                             // 会话失效：后续学期没有意义，整体中止，引导重新登录。
                             historyCursorYear = historyEndYear + 1;
-                            new android.app.AlertDialog.Builder(MainActivity.this)
-                                    .setTitle("统一门户登录已失效")
-                                    .setMessage("历史学期同步已中止。请到「设置 → 教务账号与节点」"
+                            new androidx.appcompat.app.AlertDialog.Builder(MainActivity.this)
+                                    .setTitle(Schools.loginLabel(MainActivity.this) + "登录已失效")
+                                    .setMessage("历史学期同步已中止。请到「设置 → 教务账号」"
                                             + "重新登录后，再点「同步历史学期」。")
                                     .setPositiveButton("去登录", (d2, w2) -> openWeb("portal"))
                                     .setNegativeButton("稍后", null)
@@ -855,7 +915,7 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
     private String effectiveStart() {
         String id = currentTimetable != null && currentTimetable.semester != null
                 ? currentTimetable.semester.id : "";
-        return WeekMath.effectiveStart(Prefs.semesterStartDate(this), id);
+        return WeekMath.effectiveStart(Prefs.semesterStartDate(this), id, Schools.current(this).isEcut());
     }
 
     /** 刻度标题：小字「第」+ 巨大等宽周数 + 「周」。不显示总周数。 */
@@ -892,7 +952,13 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
 
     private void refreshTimetableTab() {
         currentTimetable = TimetableStore.load(this);
+        maybeShowDrawTip(currentTimetable);
         scheduleSettings = ScheduleSettingsStore.load(this);
+        // 别的学校一天 11、12 节甚至更多：导入的课用到了后面的节次就自动扩展，只增不减
+        int usedMax = ScheduleSettings.maxSectionUsed(currentTimetable);
+        if (scheduleSettings.ensureCovers(usedMax) && ScheduleSettingsStore.save(this, scheduleSettings)) {
+            Toast.makeText(this, "课表用到了第 " + usedMax + " 节，已改成每天 " + usedMax + " 节", Toast.LENGTH_LONG).show();
+        }
         int week = currentViewedWeek();
         int total = Prefs.totalWeeks(this);
         String start = effectiveStart();
@@ -911,8 +977,12 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
         TextView subtitle = campusFragment.findViewById(R.id.tv_semester_subtitle);
         if (subtitle != null) {
             int until = WeekMath.daysUntilStart(start);
+            boolean needStart = (start == null || start.isEmpty()) && !Schools.current(this).isEcut();
+            subtitle.setOnClickListener(needStart
+                    ? v -> startActivity(new Intent(this, TimetableSettingsActivity.class)) : null);
+            subtitle.setClickable(needStart);
             subtitle.setText((start == null || start.isEmpty())
-                    ? ""
+                    ? (needStart ? "还没设第 1 周周一 · 点这里设置" : "")
                     : (until > 0 ? "距开学 " + until + " 天 · "
                             : (week != actualCurrentWeek() ? "本周是第 " + actualCurrentWeek() + " 周 · " : ""))
                             + WeekMath.weekRangeLabel(start, week)
@@ -929,7 +999,7 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
             timetableView.setFitAllSections(Prefs.fitAllSections(this));
             timetableView.setTimetable(currentTimetable, week);
             if (textDock != null && textDock.getHeight() > 0) {
-                timetableView.setBottomInset(textDock.getHeight());
+                timetableView.setBottomInset(dockInset());
             }
         }
         if (dockBlur != null) dockBlur.markDirty();
@@ -998,14 +1068,99 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
         toggleBtn.setOnClickListener(v -> {
             DiagLog.log(this, "dns", DnsFilterService.isRunning ? "用户关闭拦截" : "用户开启拦截");
             if (DnsFilterService.isRunning) {
-                startService(new Intent(this, DnsFilterService.class)
-                        .setAction(DnsFilterService.ACTION_STOP));
+                DnsControl.stop(this);
                 statusText.postDelayed(this::refreshStatus, 300);
             } else {
                 prepareAndStartVpn();
             }
         });
+
+        View pauseBtn = adblockFragment.findViewById(R.id.btn_dns_pause);
+        if (pauseBtn != null) pauseBtn.setOnClickListener(v -> {
+            if ((DnsControl.pausedUntil(this) > 0 || DnsControl.resumeOverdue(this)) && !DnsFilterService.isRunning) {
+                // 正在暂停：这个按钮变成「现在恢复」
+                prepareAndStartVpn();
+                return;
+            }
+            if (!DnsFilterService.isRunning) {
+                Toast.makeText(this, "护盾没开，不用暂停", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            Runnable doPause = () -> {
+                DiagLog.log(this, "dns", "用户暂停拦截 30 分钟");
+                DnsControl.pause(this, 30);
+                statusText.postDelayed(this::refreshStatus, 300);
+            };
+            if (!DnsControl.canNotify(this)) {
+                new androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle("通知被关了")
+                        .setMessage("30 分钟后烫梨会试着自动恢复；如果系统不让，要靠一条通知提醒你点一下。现在通知是关的，到点没恢复的话需要你回来手动打开。")
+                        .setNegativeButton("取消", null)
+                        .setPositiveButton("照样暂停", (d, w) -> doPause.run())
+                        .show();
+                return;
+            }
+            doPause.run();
+        });
+
+        TextView testResult = adblockFragment.findViewById(R.id.tv_dns_test_result);
+        View testBtn = adblockFragment.findViewById(R.id.btn_dns_test);
+        if (testBtn != null) testBtn.setOnClickListener(v -> {
+            testBtn.setEnabled(false);
+            if (testResult != null) {
+                testResult.setVisibility(View.VISIBLE);
+                testResult.setTextColor(G.SUB);
+                testResult.setText("正在解析一个广告域名…");
+            }
+            new Thread(() -> {
+                DnsControl.Verdict r = DnsControl.selfTest(getApplicationContext());
+                runOnUiThread(() -> {
+                    if (isFinishing()) return;
+                    testBtn.setEnabled(true);
+                    if (testResult == null) return;
+                    testResult.setTextColor(r.good ? G.INK : G.alarm());
+                    testResult.setText((r.good ? "✓ " : "✕ ") + r.title + " · " + r.detail);
+                });
+            }, "dns-selftest").start();
+        });
+
+        android.widget.EditText lookupInput = adblockFragment.findViewById(R.id.et_dns_lookup);
+        View lookupBtn = adblockFragment.findViewById(R.id.btn_dns_lookup);
+        TextView lookupTitle = adblockFragment.findViewById(R.id.tv_dns_lookup_title);
+        TextView lookupDetail = adblockFragment.findViewById(R.id.tv_dns_lookup_detail);
+        Runnable doLookup = () -> {
+            if (lookupInput == null) return;
+            String q = lookupInput.getText().toString();
+            android.view.inputmethod.InputMethodManager imm =
+                    (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+            if (imm != null) imm.hideSoftInputFromWindow(lookupInput.getWindowToken(), 0);
+            new Thread(() -> {
+                DnsControl.Verdict r = DnsControl.lookup(getApplicationContext(), q);
+                runOnUiThread(() -> {
+                    if (isFinishing() || lookupTitle == null || lookupDetail == null) return;
+                    lookupTitle.setVisibility(View.VISIBLE);
+                    lookupDetail.setVisibility(View.VISIBLE);
+                    lookupTitle.setTextColor(r.good ? G.INK : G.SUB);
+                    lookupTitle.setText((r.good ? "● " : "○ ") + r.title);
+                    lookupDetail.setText(r.detail);
+                });
+            }, "dns-lookup").start();
+        };
+        if (lookupBtn != null) lookupBtn.setOnClickListener(v -> doLookup.run());
+        if (lookupInput != null) lookupInput.setOnEditorActionListener((tv, id, ev) -> {
+            doLookup.run();
+            return true;
+        });
     }
+
+    /** 开着/暂停中每分钟刷一次文案。只在拦截页可见时跑。 */
+    private final Runnable uptimeTick = new Runnable() {
+        @Override
+        public void run() {
+            if (currentTab != TAB_ADBLOCK || statusText == null || isFinishing()) return;
+            refreshStatus();
+        }
+    };
 
     private void prepareAndStartVpn() {
         Intent prep = VpnService.prepare(this);
@@ -1018,37 +1173,42 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
                 .setAction(DnsFilterService.ACTION_START);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(svc);
         else startService(svc);
+        DnsControl.markStarted(this);
         if (statusText != null) statusText.postDelayed(this::refreshStatus, 500);
     }
 
     private void refreshStatus() {
         if (statusText == null) return;
-        if (DnsFilterService.isRunning) {
+        statusText.removeCallbacks(uptimeTick);
+        boolean on = DnsFilterService.isRunning;
+        long pausedUntil = DnsControl.pausedUntil(this);
+        boolean overdue = DnsControl.resumeOverdue(this);
+        if (toggleBtn != null) toggleBtn.setOn(on);
+        if (adblockHeroCard != null) adblockHeroCard.setCardBackgroundColor(on ? G.CARD : G.CHIP);
+        if (on) {
             statusText.setText(R.string.adblock_on);
-            if (statusSubtext != null) {
-                statusSubtext.setText("本地 DNS 拦截已开启");
-            }
-            if (adblockHeroCard != null) {
-                adblockHeroCard.setCardBackgroundColor(G.CARD);
-            }
+            if (statusSubtext != null) statusSubtext.setText(DnsControl.uptimeLabel(DnsControl.uptimeMs(this)));
             if (shieldBadge != null) {
-                shieldBadge.setText("● ACTIVE · 10.0.0.1/32");
-                shieldBadge.setTextColor(G.ACCENT);
+                shieldBadge.setText("● ACTIVE");
+                shieldBadge.setTextColor(G.GLASS ? G.INK : G.ACCENT);
             }
-            toggleBtn.setText(R.string.adblock_stop);
+            statusText.postDelayed(uptimeTick, 60_000L);
         } else {
-            statusText.setText(R.string.adblock_off);
+            statusText.setText(overdue ? "暂停已结束，护盾还没开" : pausedUntil > 0 ? "护盾暂停中" : getString(R.string.adblock_off));
             if (statusSubtext != null) {
-                statusSubtext.setText("点击下方按钮开启本地 DNS 拦截");
-            }
-            if (adblockHeroCard != null) {
-                adblockHeroCard.setCardBackgroundColor(G.CHIP);
+                statusSubtext.setText(overdue ? "系统没让后台自动恢复，点一下护盾或「现在恢复」"
+                        : pausedUntil > 0 ? DnsControl.pauseLabel(pausedUntil, System.currentTimeMillis())
+                        : "点一下护盾开启本地 DNS 拦截");
             }
             if (shieldBadge != null) {
-                shieldBadge.setText("○ STANDBY · 10.0.0.1/32");
-                shieldBadge.setTextColor(G.INK);
+                shieldBadge.setText(overdue ? "! NOT RESUMED" : pausedUntil > 0 ? "Ⅱ PAUSED" : "○ STANDBY");
+                shieldBadge.setTextColor(overdue ? G.alarm() : G.INK);
             }
-            toggleBtn.setText(R.string.adblock_start);
+            if (pausedUntil > 0) statusText.postDelayed(uptimeTick, 60_000L);
+        }
+        if (adblockFragment != null) {
+            TextView pause = adblockFragment.findViewById(R.id.btn_dns_pause);
+            if (pause != null) pause.setText((pausedUntil > 0 || overdue) && !on ? "现在恢复" : "暂停 30 分钟");
         }
     }
 
@@ -1069,6 +1229,8 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
         View campusRow = settingsFragment.findViewById(R.id.row_settings_campus);
         if (campusRow != null) campusRow.setOnClickListener(v ->
                 startActivity(new Intent(this, CampusActivity.class)));
+        View schoolRow = settingsFragment.findViewById(R.id.row_settings_school);
+        if (schoolRow != null) schoolRow.setOnClickListener(v -> showSchoolPicker());
         View mateRow = settingsFragment.findViewById(R.id.row_settings_classmates);
         if (mateRow != null) mateRow.setOnClickListener(v ->
                 startActivity(new Intent(this, ClassmatesActivity.class)));
@@ -1092,6 +1254,7 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
                 if (on) Notify.requestPermissionIfNeeded(this);
             });
         }
+        renderThemeSegment();
         renderNightSegment();
 
         View gradesCard = settingsFragment.findViewById(R.id.card_settings_grades);
@@ -1197,6 +1360,45 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
         if (scroll != null) scroll.scrollTo(0, 0);
     }
 
+    /** 主题两段：纸墨 / 磨砂玻璃。切换时从点的位置圆形扩散。 */
+    private void renderThemeSegment() {
+        LinearLayout seg = settingsFragment.findViewById(R.id.seg_theme);
+        if (seg == null) return;
+        seg.removeAllViews();
+        String[] labels = {"纸墨", "磨砂玻璃"};
+        int cur = Prefs.theme(this);
+        float d = getResources().getDisplayMetrics().density;
+        GradientDrawable box = new GradientDrawable();
+        box.setCornerRadius((G.GLASS ? 19 : 6) * d);
+        if (G.GLASS) box.setColor(G.CHIP); else box.setStroke(Math.max(1, Math.round(d)), G.STROKE);
+        seg.setBackground(box);
+        seg.setPadding(Math.round(3 * d), Math.round(3 * d), Math.round(3 * d), Math.round(3 * d));
+        for (int i = 0; i < labels.length; i++) {
+            final int theme = i;
+            TextView tv = new TextView(this);
+            tv.setText(labels[i]);
+            tv.setGravity(android.view.Gravity.CENTER);
+            tv.setTextSize(12.5f);
+            boolean on = i == cur;
+            tv.setTypeface(on ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+            tv.setTextColor(on ? G.ON_INK : G.SUB);
+            if (on) {
+                GradientDrawable bg = new GradientDrawable();
+                bg.setCornerRadius((G.GLASS ? 16 : 4) * d);
+                bg.setColor(G.INK);
+                tv.setBackground(bg);
+            }
+            tv.setOnClickListener(v -> {
+                if (theme == Prefs.theme(this)) return;
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
+                ThemeReveal.capture(this, v, currentTab, settingsPage);
+                Prefs.setTheme(this, theme);
+                recreate();
+            });
+            seg.addView(tv, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+        }
+    }
+
     /** 深色模式三段：跟随系统 / 浅色 / 深色。 */
     private void renderNightSegment() {
         LinearLayout seg = settingsFragment.findViewById(R.id.seg_night_mode);
@@ -1206,8 +1408,8 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
         int cur = Prefs.nightMode(this);
         float d = getResources().getDisplayMetrics().density;
         GradientDrawable box = new GradientDrawable();
-        box.setCornerRadius(6 * d);
-        box.setStroke(Math.max(1, Math.round(d)), G.STROKE);
+        box.setCornerRadius((G.GLASS ? 19 : 6) * d);
+        if (G.GLASS) box.setColor(G.CHIP); else box.setStroke(Math.max(1, Math.round(d)), G.STROKE);
         seg.setBackground(box);
         seg.setPadding(Math.round(3 * d), Math.round(3 * d), Math.round(3 * d), Math.round(3 * d));
         for (int i = 0; i < labels.length; i++) {
@@ -1221,12 +1423,13 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
             tv.setTextColor(on ? G.ON_INK : G.SUB);
             if (on) {
                 GradientDrawable bg = new GradientDrawable();
-                bg.setCornerRadius(4 * d);
+                bg.setCornerRadius((G.GLASS ? 16 : 4) * d);
                 bg.setColor(G.INK);
                 tv.setBackground(bg);
             }
             tv.setOnClickListener(v -> {
                 if (mode == Prefs.nightMode(this)) return;
+                ThemeReveal.capture(this, v, currentTab, settingsPage);
                 Prefs.setNightMode(this, mode);
                 App.applyNightMode(mode); // 会重建 Activity
             });
@@ -1259,7 +1462,9 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
 
         TextView statusLine = settingsFragment.findViewById(R.id.tv_settings_status_line);
         if (statusLine != null) {
-            statusLine.setText(com.ecut.campus.data.AcademicCalendar.statusLine(WeekMath.todayDateLabel()));
+            statusLine.setText(Schools.isEcut(this)
+                    ? com.ecut.campus.data.AcademicCalendar.statusLine(WeekMath.todayDateLabel())
+                    : Schools.current(this).name);
         }
         TextView gradeNew = settingsFragment.findViewById(R.id.tv_settings_grade_new);
         if (gradeNew != null) {
@@ -1280,8 +1485,9 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
         TextView scheduleSummary = settingsFragment.findViewById(R.id.tv_settings_schedule_summary);
         if (scheduleSummary != null) {
             ScheduleSettings s = ScheduleSettingsStore.load(this);
-            scheduleSummary.setText("第 1 节 " + s.firstClassStart + " 开始  ·  第 10 节 "
-                    + s.rangeLabel(10));
+            int n = s.sectionCount();
+            scheduleSummary.setText("每天 " + n + " 节  ·  第 1 节 " + s.firstClassStart + " 开始  ·  第 " + n + " 节 "
+                    + s.rangeLabel(n));
         }
 
         TextView timetableSummary = settingsFragment.findViewById(R.id.tv_settings_timetable_summary);
@@ -1291,11 +1497,15 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
                     + (start.isEmpty() ? "  ·  未设开学日期" : ""));
         }
 
+        SchoolProfile school = Schools.current(this);
+        bindSchoolRow(school);
         TextView hostTv = settingsFragment.findViewById(R.id.host_status_text);
         TextView badgeTv = settingsFragment.findViewById(R.id.tv_settings_node_badge);
         String host = Prefs.portalHost(this);
         boolean hasSession = Prefs.hasPortalSession(this);
-        if (hostTv != null) {
+        if (hostTv != null && !school.isEcut()) {
+            bindOtherSchoolAccount(school, hostTv, badgeTv, hasSession);
+        } else if (hostTv != null) {
             if (hasSession) {
                 hostTv.setText(host != null && !host.isEmpty()
                         ? "统一门户已登录 · 教务节点 " + host
@@ -1421,9 +1631,23 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
             Toast.makeText(this, "正在同步，请稍候", Toast.LENGTH_SHORT).show();
             return;
         }
+        SchoolProfile school = Schools.current(this);
+        if (kind == CampusSyncClient.Kind.GRADES && !school.supportsGrades()) {
+            Toast.makeText(this, "这个学校暂不支持成绩", Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (kind == CampusSyncClient.Kind.TIMETABLE && !school.supportsBackgroundSync()) {
+            new AlertDialog.Builder(this)
+                    .setTitle("这个学校还不能后台同步")
+                    .setMessage("打开教务网页，登录后进入「我的课表」页面，点底部的「导入此页课表」就能把课表导进来。")
+                    .setNegativeButton("取消", null)
+                    .setPositiveButton("打开教务", (d, w) -> openWeb("timetable"))
+                    .show();
+            return;
+        }
         if (!Prefs.hasPortalSession(this)) {
             new AlertDialog.Builder(this)
-                    .setTitle("请先登录统一门户")
+                    .setTitle("请先登录" + Schools.loginLabel(this))
                     .setMessage("登录一次后，课表与成绩都能在后台静默更新，不再跳转网页。")
                     .setNegativeButton("取消", null)
                     .setPositiveButton("去登录", (d, w) -> openWeb("portal"))
@@ -1463,7 +1687,8 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
                         if (Prefs.sessionExpired(MainActivity.this)) {
                             new AlertDialog.Builder(MainActivity.this)
                                     .setTitle("登录已过期")
-                                    .setMessage("统一门户的登录失效了。重新登录一次，课表和成绩就能继续静默更新。")
+                                    .setMessage(Schools.loginLabel(MainActivity.this)
+                                            + "的登录失效了。重新登录一次，课表和成绩就能继续静默更新。")
                                     .setNegativeButton("稍后", null)
                                     .setPositiveButton("去登录", (d, w) -> openWeb("portal"))
                                     .show();
@@ -1472,6 +1697,187 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
                         }
                     }
                 });
+    }
+
+    // ==================== 学校 ====================
+
+    /** 设置页「学校」行与东华理工专属入口的显隐。 */
+    /** 「00」位置：有缓存的校徽就显示原色校徽，没有就后台去学校官网抓一次。 */
+    private void bindSchoolBadge(SchoolProfile school) {
+        if (settingsFragment == null) return;
+        android.widget.ImageView badge = settingsFragment.findViewById(R.id.iv_settings_school_badge);
+        TextView index = settingsFragment.findViewById(R.id.tv_settings_school_index);
+        if (badge == null || index == null) return;
+        android.graphics.Bitmap bmp = SchoolBadgeLoader.cached(this, school);
+        if (bmp != null) {
+            badge.setImageBitmap(bmp);
+            badge.setVisibility(View.VISIBLE);
+            index.setVisibility(View.INVISIBLE);
+            return;
+        }
+        badge.setVisibility(View.GONE);
+        index.setVisibility(View.VISIBLE);
+        final String schoolId = school.id;
+        SchoolBadgeLoader.ensure(this, school, b -> {
+            if (isFinishing() || settingsFragment == null) return;
+            if (!schoolId.equals(Schools.current(this).id)) return;
+            android.widget.ImageView iv = settingsFragment.findViewById(R.id.iv_settings_school_badge);
+            TextView tv = settingsFragment.findViewById(R.id.tv_settings_school_index);
+            if (iv == null || tv == null) return;
+            iv.setImageBitmap(b);
+            iv.setAlpha(0f);
+            iv.setVisibility(View.VISIBLE);
+            iv.animate().alpha(1f).setDuration(220).start();
+            tv.setVisibility(View.INVISIBLE);
+        });
+    }
+
+    private void bindSchoolRow(SchoolProfile school) {
+        bindSchoolBadge(school);
+        TextView sub = settingsFragment.findViewById(R.id.tv_settings_school_sub);
+        if (sub != null) {
+            String detail = school.isEcut() ? "已适配 · 课表、成绩、校历、地图"
+                    : school.vendor.label + "教务"
+                    + (school.supportsBackgroundSync() ? " · 可后台同步课表" : " · 在教务页「导入此页课表」")
+                    + (school.supportsGrades() ? " · 成绩" : "");
+            sub.setText(school.name + " · " + detail);
+        }
+        int vis = school.ecutFeatures ? View.VISIBLE : View.GONE;
+        View campusRow = settingsFragment.findViewById(R.id.row_settings_campus);
+        if (campusRow != null) campusRow.setVisibility(vis);
+        View campusHair = settingsFragment.findViewById(R.id.hair_settings_campus);
+        if (campusHair != null) campusHair.setVisibility(vis);
+        TextView portalBtn = settingsFragment.findViewById(R.id.btn_settings_open_portal);
+        if (portalBtn != null) portalBtn.setText("登录" + Schools.loginLabel(this));
+        TextView gradeSummary = settingsFragment.findViewById(R.id.tv_settings_grade_summary);
+        if (gradeSummary != null && !school.supportsGrades()) gradeSummary.setText("这个学校暂不支持成绩");
+    }
+
+    private void bindOtherSchoolAccount(SchoolProfile school, TextView hostTv, TextView badgeTv,
+                                        boolean hasSession) {
+        String how = school.supportsBackgroundSync()
+                ? "课表可在后台同步" : "登录后在课表页点「导入此页课表」";
+        if (hasSession && Prefs.sessionExpired(this)) {
+            hostTv.setText("登录已过期：点「登录教务系统」重新登录一次");
+            if (badgeTv != null) {
+                badgeTv.setText("● 登录已过期");
+                badgeTv.setTextColor(G.ACCENT);
+            }
+        } else if (hasSession) {
+            hostTv.setText("教务系统已登录 · " + how);
+            if (badgeTv != null) {
+                badgeTv.setText("● 已登录");
+                badgeTv.setTextColor(G.INK);
+                badgeTv.setBackgroundColor(0x00000000);
+            }
+        } else {
+            hostTv.setText("首次使用请点「登录教务系统」，在网页里登录你的教务账号；" + how);
+            if (badgeTv != null) {
+                badgeTv.setText("○ 待连接");
+                badgeTv.setTextColor(G.MUTE);
+                badgeTv.setBackgroundColor(0x00000000);
+            }
+        }
+    }
+
+    private void showSchoolPicker() {
+        List<SchoolProfile> builtins = Schools.builtin(this);
+        SchoolProfile cur = Schools.current(this);
+        SchoolProfile custom = Schools.custom(this);
+        String[] items = new String[builtins.size() + 1];
+        for (int i = 0; i < builtins.size(); i++) {
+            SchoolProfile p = builtins.get(i);
+            items[i] = p.name + (p.id.equals(cur.id) ? "  ✓" : "");
+        }
+        items[builtins.size()] = custom == null ? "自定义学校（输入教务网址）"
+                : "自定义学校：" + custom.name + (cur.isCustom() ? "  ✓" : "") + "（点此修改）";
+        new AlertDialog.Builder(this)
+                .setTitle("选择学校")
+                .setItems(items, (d, which) -> {
+                    if (which < builtins.size()) {
+                        SchoolProfile p = builtins.get(which);
+                        if (p.id.equals(cur.id)) return;
+                        Schools.select(this, p);
+                        refreshSettingsTab();
+                        Toast.makeText(this, "已切换到 " + p.name, Toast.LENGTH_SHORT).show();
+                    } else {
+                        showCustomSchoolDialog(custom);
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void showCustomSchoolDialog(SchoolProfile existing) {
+        int pad = Math.round(20 * getResources().getDisplayMetrics().density);
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(pad, pad / 2, pad, 0);
+        android.widget.EditText name = new android.widget.EditText(this);
+        name.setHint("学校名称（可不填）");
+        name.setSingleLine(true);
+        android.widget.EditText url = new android.widget.EditText(this);
+        url.setHint("教务网址，如 jw.xxx.edu.cn/jwglxt");
+        url.setSingleLine(true);
+        url.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_VARIATION_URI);
+        if (existing != null) {
+            if (!"自定义学校".equals(existing.name)) name.setText(existing.name);
+            url.setText(existing.loginUrl);
+        }
+        TextView label = new TextView(this);
+        label.setText("教务系统类型");
+        label.setPadding(0, pad / 2, 0, 0);
+        android.widget.RadioGroup group = new android.widget.RadioGroup(this);
+        String[] vendors = {"自动识别", "正方", "强智", "其他 / 不知道"};
+        for (int i = 0; i < vendors.length; i++) {
+            android.widget.RadioButton rb = new android.widget.RadioButton(this);
+            rb.setText(vendors[i]);
+            rb.setId(View.generateViewId());
+            rb.setTag(i);
+            group.addView(rb);
+            if (i == 0) group.check(rb.getId());
+        }
+        TextView tip = new TextView(this);
+        tip.setText("打开教务登录页后，把浏览器地址栏里的网址复制过来就行。烫梨不会保存你的账号密码，登录在网页里完成。");
+        tip.setTextSize(12);
+        tip.setPadding(0, pad / 2, 0, 0);
+        box.addView(name);
+        box.addView(url);
+        box.addView(label);
+        box.addView(group);
+        box.addView(tip);
+        new AlertDialog.Builder(this)
+                .setTitle("自定义学校")
+                .setView(box)
+                .setNegativeButton("取消", null)
+                .setPositiveButton("保存", (d, w) -> {
+                    View checked = group.findViewById(group.getCheckedRadioButtonId());
+                    int idx = checked == null ? 0 : (int) checked.getTag();
+                    SchoolProfile.Vendor vendor = idx == 1 ? SchoolProfile.Vendor.ZHENGFANG
+                            : idx == 2 ? SchoolProfile.Vendor.QIANGZHI
+                            : idx == 3 ? SchoolProfile.Vendor.OTHER : null;
+                    SchoolProfile p = SchoolProfile.custom(url.getText().toString(), vendor);
+                    if (p == null) {
+                        Toast.makeText(this, "网址不对，请检查一下", Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    String n = name.getText().toString().trim();
+                    if (!n.isEmpty()) p.name = n;
+                    Schools.select(this, p);
+                    refreshSettingsTab();
+                    String msg = p.vendor == SchoolProfile.Vendor.OTHER
+                            ? "没认出教务系统类型。登录后进入课表页，点底部的「导入此页课表」试试。"
+                            : "识别为" + p.vendor.label + "教务。先登录一次教务系统，之后就能同步课表"
+                            + (p.supportsGrades() ? "和成绩" : "") + "。";
+                    new AlertDialog.Builder(this)
+                            .setTitle("已保存")
+                            .setMessage(msg)
+                            .setNegativeButton("稍后", null)
+                            .setPositiveButton("去登录", (d2, w2) -> openWeb("portal"))
+                            .show();
+                })
+                .show();
     }
 
     private WebView newWebViewForSync() {
