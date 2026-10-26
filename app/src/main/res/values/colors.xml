@@ -21,4 +21,31 @@
     <color name="g_on_ink">#FBFAF7</color>
     <color name="g_warn">#B4540A</color>
     <color name="g_ok">#2F5D3A</color>
+    <!-- 磨砂玻璃色板 -->
+    <color name="glass_paper">#EEECE8</color>
+    <color name="glass_card">#B8FFFFFF</color>
+    <color name="glass_card_stroke">#CCFFFFFF</color>
+    <color name="glass_ink">#1B1B1F</color>
+    <color name="glass_sub">#55555C</color>
+    <color name="glass_sub2">#44444A</color>
+    <color name="glass_mute">#8A8A91</color>
+    <color name="glass_line">#14000000</color>
+    <color name="glass_chip">#73FFFFFF</color>
+    <color name="glass_accent">#1B1B1F</color>
+    <color name="glass_hair">#17000000</color>
+    <color name="glass_stroke">#29000000</color>
+    <color name="glass_ink_18">#2E1B1B1F</color>
+    <color name="glass_ink_12">#1F1B1B1F</color>
+    <color name="glass_ink_08">#141B1B1F</color>
+    <color name="glass_dock_top">#B3FFFFFF</color>
+    <color name="glass_dock_bottom">#80FFFFFF</color>
+    <color name="glass_on_ink">#FFFFFF</color>
+    <color name="glass_nav">#00000000</color>
+    <color name="glass_bd_base">#E7E5E1</color>
+    <color name="glass_bd_1">#D9C6B2</color>
+    <color name="glass_bd_2">#C3CDD6</color>
+    <color name="glass_bd_3">#D6CFC0</color>
+    <color name="glass_bd_4">#CDC5D4</color>
+    <color name="glass_dialog">#F6F5F3</color>
+    <color name="glass_dialog_sheet">#F5F8F7F5</color>
 </resources>

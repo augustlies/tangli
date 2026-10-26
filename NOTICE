@@ -1,0 +1,20 @@
+烫梨 (tangli)
+Copyright (C) 2026 August Lies (github.com/augustlies)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version. See LICENSE.
+
+Versions up to and including v1.2.3 were released under the MIT License
+and remain available under it. Starting with v1.2.4, tangli is licensed
+under GPL-3.0-or-later.
+
+Ad rules partly from anti-AD (MIT License,
+https://github.com/privacy-protection-tools/anti-AD).
+
+The QiangZhi (强智) timetable parser follows the page structure described
+in the shiguang_warehouse adapter repository (MIT License); it is an
+independent implementation and contains no copied code.
+
+部分控件的视觉灵感来自 Uiverse.io 社区组件库 galaxy（https://github.com/uiverse-io/galaxy，MIT 许可），已按原生 Android 重新实现，未直接使用其代码。

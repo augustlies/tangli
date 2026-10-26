@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+：弹窗背后真模糊，片子本身更透 -->
+    <style name="Glass.Dialog" parent="Gauge.Dialog">
+        <item name="android:windowBackground">@drawable/bg_glass_dialog</item>
+        <item name="android:backgroundDimAmount">0.12</item>
+        <item name="android:windowBackgroundBlurRadius">36dp</item>
+        <item name="android:windowBlurBehindEnabled">true</item>
+        <item name="android:windowBlurBehindRadius">10dp</item>
+    </style>
+    <style name="Glass.Dialog.Framework" parent="Gauge.Dialog.Framework">
+        <item name="android:windowBackground">@drawable/bg_glass_dialog</item>
+        <item name="android:backgroundDimAmount">0.12</item>
+        <item name="android:windowBackgroundBlurRadius">36dp</item>
+        <item name="android:windowBlurBehindEnabled">true</item>
+        <item name="android:windowBlurBehindRadius">10dp</item>
+    </style>
+</resources>

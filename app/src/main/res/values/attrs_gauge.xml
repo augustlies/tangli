@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 主题色板：纸墨 / 磨砂玻璃 共用同一组属性，布局里一律用 ?attr/gXxx -->
+    <attr name="gBg" format="color" />
+    <attr name="gPaper" format="color" />
+    <attr name="gCard" format="color" />
+    <attr name="gCardStroke" format="color" />
+    <attr name="gInk" format="color" />
+    <attr name="gSub" format="color" />
+    <attr name="gSub2" format="color" />
+    <attr name="gMute" format="color" />
+    <attr name="gLine" format="color" />
+    <attr name="gChip" format="color" />
+    <attr name="gAccent" format="color" />
+    <attr name="gHair" format="color" />
+    <attr name="gStroke" format="color" />
+    <attr name="gInk18" format="color" />
+    <attr name="gInk12" format="color" />
+    <attr name="gInk08" format="color" />
+    <attr name="gPaperE8" format="color" />
+    <attr name="gPaperC8" format="color" />
+    <attr name="gOnInk" format="color" />
+    <attr name="gWarn" format="color" />
+    <attr name="gOk" format="color" />
+    <attr name="gCardRadius" format="dimension" />
+    <attr name="gSmallRadius" format="dimension" />
+    <attr name="gDialog" format="color" />
+    <attr name="gGlass" format="boolean" />
+</resources>

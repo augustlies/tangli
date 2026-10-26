@@ -6,12 +6,12 @@
     android:layout_marginBottom="12dp"
     android:clickable="true"
     android:focusable="true"
-    app:cardBackgroundColor="@color/g_card"
-    app:cardCornerRadius="8dp"
+    app:cardBackgroundColor="?attr/gCard"
+    app:cardCornerRadius="?attr/gCardRadius"
     app:cardElevation="0dp"
-    app:strokeColor="@color/g_line"
+    app:strokeColor="?attr/gLine"
     app:strokeWidth="1dp"
-    app:rippleColor="@color/g_ink_12">
+    app:rippleColor="?attr/gInk12">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -24,10 +24,10 @@
             android:id="@+id/card_badge"
             android:layout_width="46dp"
             android:layout_height="46dp"
-            android:background="@color/g_chip"
+            android:background="?attr/gChip"
             android:gravity="center"
             android:text="课"
-            android:textColor="@color/g_ink"
+            android:textColor="?attr/gInk"
             android:textSize="18sp"
             android:textStyle="bold" />
 
@@ -43,7 +43,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:fontFamily="sans-serif-medium"
-                android:textColor="@color/g_ink"
+                android:textColor="?attr/gInk"
                 android:textSize="17sp"
                 android:textStyle="bold" />
 
@@ -55,7 +55,7 @@
                 android:ellipsize="end"
                 android:fontFamily="sans-serif"
                 android:maxLines="1"
-                android:textColor="@color/g_sub"
+                android:textColor="?attr/gSub"
                 android:textSize="13sp" />
         </LinearLayout>
 

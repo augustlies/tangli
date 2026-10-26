@@ -21,7 +21,7 @@ export PATH="$JAVA_HOME/bin:$PATH"
 ./gradlew testReleaseUnitTest --console=plain
 ```
 
-改完代码**必须跑测试**（当前 88 个，应全绿）。
+改完代码**必须跑测试**（当前 157 个，应全绿）。
 
 ## 装到真机
 
@@ -36,6 +36,7 @@ adb install -r app/build/outputs/apk/release/app-release.apk
 - Java 17，不引入 Kotlin
 - 不为「以后可能用到」写抽象层
 - 数据层（`com.ecut.campus.data`）保持无 Android 依赖，便于 JVM 单测
+- 多学校：学校配置在 `assets/schools.json` + `data/SchoolProfile`，课表来源实现 `data/TimetableSource`（正方 / 强智）。东华理工的同步流程（零信任 + 办事大厅兜底）不要动，其他学校走独立分支
 - 改动涉及数据结构时，同步更新 `docs/DATA-SCHEMA.md` 和 `CHANGELOG.md`
 
 ## 下一步

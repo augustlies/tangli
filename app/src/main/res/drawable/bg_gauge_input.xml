@@ -5,7 +5,7 @@
         <layer-list>
             <item><shape><solid android:color="#00000000" /></shape></item>
             <item android:gravity="bottom" android:height="1.5dp">
-                <shape><solid android:color="@color/g_ink" /></shape>
+                <shape><solid android:color="?attr/gInk" /></shape>
             </item>
         </layer-list>
     </item>
@@ -13,7 +13,7 @@
         <layer-list>
             <item><shape><solid android:color="#00000000" /></shape></item>
             <item android:gravity="bottom" android:height="1dp">
-                <shape><solid android:color="@color/g_stroke" /></shape>
+                <shape><solid android:color="?attr/gStroke" /></shape>
             </item>
         </layer-list>
     </item>

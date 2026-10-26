@@ -9,16 +9,16 @@
         <item name="android:layout_marginBottom">8dp</item>
         <item name="android:fontFamily">monospace</item>
         <item name="android:letterSpacing">0.08</item>
-        <item name="android:textColor">@color/g_mute</item>
+        <item name="android:textColor">?attr/gMute</item>
         <item name="android:textSize">11sp</item>
     </style>
     <style name="G.Card">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="cardBackgroundColor">@color/g_card</item>
-        <item name="cardCornerRadius">8dp</item>
+        <item name="cardBackgroundColor">?attr/gCard</item>
+        <item name="cardCornerRadius">?attr/gCardRadius</item>
         <item name="cardElevation">0dp</item>
-        <item name="strokeColor">@color/g_line</item>
+        <item name="strokeColor">?attr/gCardStroke</item>
         <item name="strokeWidth">1dp</item>
     </style>
     <style name="G.Row">
@@ -36,7 +36,7 @@
     <style name="G.RowTitle">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:textColor">@color/g_ink</item>
+        <item name="android:textColor">?attr/gInk</item>
         <item name="android:textSize">15.5sp</item>
         <item name="android:textStyle">bold</item>
     </style>
@@ -44,33 +44,42 @@
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:layout_marginTop">3dp</item>
-        <item name="android:textColor">@color/g_sub</item>
+        <item name="android:textColor">?attr/gSub</item>
         <item name="android:textSize">12.5sp</item>
     </style>
     <style name="G.RowChevron">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:text">›</item>
-        <item name="android:textColor">@color/g_mute</item>
+        <item name="android:textColor">?attr/gMute</item>
         <item name="android:textSize">22sp</item>
     </style>
     <style name="G.RowIndex">
         <item name="android:layout_width">30dp</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:fontFamily">monospace</item>
-        <item name="android:textColor">@color/g_mute</item>
+        <item name="android:textColor">?attr/gMute</item>
         <item name="android:textSize">11sp</item>
     </style>
     <style name="G.Hair">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">1px</item>
         <item name="android:layout_marginStart">48dp</item>
-        <item name="android:background">@color/g_line</item>
+        <item name="android:background">?attr/gLine</item>
+    </style>
+    <!-- 设置首页：压紧到一屏放下，避免只多出一小截的发飘滚动 -->
+    <style name="G.SectionLabel.Tight">
+        <item name="android:layout_marginTop">16dp</item>
+        <item name="android:layout_marginBottom">6dp</item>
+    </style>
+    <style name="G.Row.Tight">
+        <item name="android:minHeight">52dp</item>
+        <item name="android:paddingVertical">10dp</item>
     </style>
     <style name="G.PageTitle">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:textColor">@color/g_ink</item>
+        <item name="android:textColor">?attr/gInk</item>
         <item name="android:textSize">24sp</item>
         <item name="android:textStyle">bold</item>
     </style>

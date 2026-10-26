@@ -38,6 +38,14 @@ public class DockBlurView extends View {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             setRenderEffect(RenderEffect.createBlurEffect(24f, 24f, Shader.TileMode.CLAMP));
         }
+        // 胶囊形状：模糊层裁成和 Dock 一样的圆角
+        setOutlineProvider(new android.view.ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, android.graphics.Outline outline) {
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), view.getHeight() / 2f);
+            }
+        });
+        setClipToOutline(true);
     }
 
     public void setSource(View source) {
@@ -67,8 +75,9 @@ public class DockBlurView extends View {
             snapshot = Bitmap.createBitmap(bw, bh, Bitmap.Config.ARGB_8888);
             Canvas c = new Canvas(snapshot);
             c.scale(1f / scale, 1f / scale);
-            int srcTop = Math.max(0, source.getHeight() - h - extraTopPx);
-            c.translate(0, -srcTop);
+            // Dock 悬浮、不贴底：按自己在父布局里的实际位置截取
+            int srcTop = Math.max(0, getTop() - extraTopPx);
+            c.translate(-getLeft(), -srcTop);
             source.draw(c);
             dirty = false;
         }

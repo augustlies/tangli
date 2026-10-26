@@ -3,13 +3,13 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/g_paper"
+    android:background="?attr/gBg"
     android:orientation="vertical">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="52dp"
-        android:background="@color/g_paper"
+        android:background="?attr/gBg"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="8dp">
@@ -32,7 +32,7 @@
             android:fontFamily="sans-serif-medium"
             android:maxLines="1"
             android:text="教务"
-            android:textColor="@color/g_ink"
+            android:textColor="?attr/gInk"
             android:textSize="17sp"
             android:textStyle="bold" />
 
@@ -47,7 +47,7 @@
             android:paddingHorizontal="12dp"
             android:text="手机适配"
             android:textSize="12sp"
-            app:cornerRadius="6dp" />
+            app:cornerRadius="?attr/gSmallRadius" />
 
         <ImageButton
             android:id="@+id/btn_web_refresh"
@@ -65,7 +65,7 @@
         android:layout_width="match_parent"
         android:layout_height="2dp"
         android:max="100"
-        android:progressTint="@color/g_ink"
+        android:progressTint="?attr/gInk"
         android:visibility="gone" />
 
     <FrameLayout
@@ -98,7 +98,7 @@
                 android:layout_width="6dp"
                 android:layout_height="6dp"
                 android:layout_marginEnd="10dp"
-                android:background="@color/g_accent" />
+                android:background="?attr/gAccent" />
 
             <TextView
                 android:id="@+id/web_hint_text"
@@ -106,7 +106,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:lineSpacingExtra="2dp"
-                android:textColor="@color/g_ink"
+                android:textColor="?attr/gInk"
                 android:textSize="13sp" />
 
             <TextView
@@ -118,9 +118,24 @@
                 android:gravity="center"
                 android:paddingHorizontal="10dp"
                 android:text="知道了"
-                android:textColor="@color/g_sub"
+                android:textColor="?attr/gSub"
                 android:textSize="13sp" />
         </LinearLayout>
+
+        <!-- 其他学校：常驻「导入此页课表」 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_import_page"
+            style="@style/Gauge.Button"
+            android:layout_width="wrap_content"
+            android:layout_height="46dp"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="24dp"
+            android:elevation="8dp"
+            android:paddingHorizontal="22dp"
+            android:text="导入此页课表"
+            android:textSize="14sp"
+            android:visibility="gone"
+            app:cornerRadius="23dp" />
     </FrameLayout>
 
 </LinearLayout>

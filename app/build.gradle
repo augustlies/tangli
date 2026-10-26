@@ -21,8 +21,8 @@ android {
         applicationId "com.ecut.campus"
         minSdk 24
         targetSdk 33
-        versionCode 19
-        versionName "1.2.3"
+        versionCode 27
+        versionName "1.2.4"
     }
 
     signingConfigs {

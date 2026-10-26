@@ -48,8 +48,8 @@ public final class IcsExporter {
                     day.add(Calendar.DAY_OF_YEAR, (week - 1) * 7 + (s.dayOfWeek - 1));
                     String ymd = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(day.getTime());
 
-                    int secStart = Math.max(1, Math.min(ScheduleSettings.SECTION_COUNT, s.startSection));
-                    int secEnd = Math.max(secStart, Math.min(ScheduleSettings.SECTION_COUNT, s.endSection));
+                    int secStart = Math.max(1, Math.min(ScheduleSettings.MAX_SECTIONS, s.startSection));
+                    int secEnd = Math.max(secStart, Math.min(ScheduleSettings.MAX_SECTIONS, s.endSection));
                     int startMinutes = s.hasCustomTime()
                             ? Timetable.Session.minutesOf(s.timeStart) : sched.startMinutes(secStart);
                     int endMinutes = s.hasCustomTime()

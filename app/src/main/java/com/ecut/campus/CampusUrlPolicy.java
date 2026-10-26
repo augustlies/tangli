@@ -54,6 +54,14 @@ final class CampusUrlPolicy {
                 || h.equals(BARE_HOST);
     }
 
+    /**
+     * 当前学校允许打开的地址：东华理工的域名照旧放行，再加上所选学校白名单里的域名。
+     */
+    static boolean isAllowedFor(com.ecut.campus.data.SchoolProfile school, String url) {
+        if (isAllowedCampusUrl(url)) return true;
+        return school != null && school.allowsUrl(url);
+    }
+
     static boolean isEhallUrl(String url) {
         if (url == null) return false;
         URI uri;

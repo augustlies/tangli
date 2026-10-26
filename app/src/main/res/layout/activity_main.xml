@@ -2,7 +2,7 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/g_paper">
+    android:background="?attr/gBg">
 
     <FrameLayout
         android:id="@+id/content_container"
@@ -15,56 +15,21 @@
         android:layout_height="1dp"
         android:alpha="0" />
 
+    <!-- 悬浮胶囊 Dock：玻璃主题下垫一层真模糊（Android 12+），形状跟胶囊一致 -->
     <com.ecut.campus.DockBlurView
         android:id="@+id/dock_blur"
         android:layout_width="match_parent"
-        android:layout_height="58dp"
+        android:layout_height="56dp"
         android:layout_gravity="bottom"
-        android:background="@drawable/bg_text_dock" />
+        android:layout_marginHorizontal="22dp"
+        android:layout_marginBottom="14dp" />
 
-    <LinearLayout
+    <com.ecut.campus.CapsuleDock
         android:id="@+id/text_dock"
         android:layout_width="match_parent"
-        android:layout_height="58dp"
+        android:layout_height="56dp"
         android:layout_gravity="bottom"
-        android:background="@drawable/bg_text_dock"
-        android:gravity="center"
-        android:orientation="horizontal"
-        android:paddingHorizontal="28dp">
-
-        <TextView
-            android:id="@+id/dock_timetable"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:gravity="center"
-            android:text="课表"
-            android:textColor="@color/g_ink"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/dock_adblock"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:gravity="center"
-            android:text="拦截"
-            android:textColor="@color/g_mute"
-            android:textSize="14sp" />
-
-        <TextView
-            android:id="@+id/dock_settings"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:gravity="center"
-            android:text="设置"
-            android:textColor="@color/g_mute"
-            android:textSize="14sp" />
-    </LinearLayout>
+        android:layout_marginHorizontal="22dp"
+        android:layout_marginBottom="14dp" />
 
 </FrameLayout>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 磨砂玻璃的柔光底：四团低饱和径向光斑，模拟虚化的壁纸 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item><shape><solid android:color="@color/glass_bd_base" /></shape></item>
+    <item android:gravity="top|start" android:width="560dp" android:height="560dp" android:left="-240dp" android:top="-200dp">
+        <shape android:shape="oval">
+            <gradient android:type="radial" android:gradientRadius="280dp"
+                android:startColor="@color/glass_bd_1" android:endColor="#00000000" />
+        </shape>
+    </item>
+    <item android:gravity="center_vertical|end" android:width="600dp" android:height="600dp" android:right="-300dp">
+        <shape android:shape="oval">
+            <gradient android:type="radial" android:gradientRadius="300dp"
+                android:startColor="@color/glass_bd_2" android:endColor="#00000000" />
+        </shape>
+    </item>
+    <item android:gravity="bottom|start" android:width="600dp" android:height="600dp" android:left="-260dp" android:bottom="-120dp">
+        <shape android:shape="oval">
+            <gradient android:type="radial" android:gradientRadius="300dp"
+                android:startColor="@color/glass_bd_3" android:endColor="#00000000" />
+        </shape>
+    </item>
+    <item android:gravity="bottom|end" android:width="520dp" android:height="520dp" android:right="-220dp" android:bottom="-240dp">
+        <shape android:shape="oval">
+            <gradient android:type="radial" android:gradientRadius="260dp"
+                android:startColor="@color/glass_bd_4" android:endColor="#00000000" />
+        </shape>
+    </item>
+</layer-list>

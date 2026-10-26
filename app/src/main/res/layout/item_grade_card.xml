@@ -17,7 +17,7 @@
             android:layout_height="wrap_content"
             android:fontFamily="monospace"
             android:text="01"
-            android:textColor="@color/g_mute"
+            android:textColor="?attr/gMute"
             android:textSize="11sp" />
 
         <LinearLayout
@@ -33,7 +33,7 @@
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:text="课程"
-                android:textColor="@color/g_ink"
+                android:textColor="?attr/gInk"
                 android:textSize="15sp" />
 
             <TextView
@@ -45,7 +45,7 @@
                 android:fontFamily="monospace"
                 android:maxLines="1"
                 android:text=""
-                android:textColor="@color/g_mute"
+                android:textColor="?attr/gMute"
                 android:textSize="11sp" />
         </LinearLayout>
 
@@ -63,7 +63,7 @@
                 android:fontFamily="monospace"
                 android:includeFontPadding="false"
                 android:text="92"
-                android:textColor="@color/g_ink"
+                android:textColor="?attr/gInk"
                 android:textSize="22sp"
                 android:textStyle="bold" />
 
@@ -72,13 +72,13 @@
                 android:layout_width="56dp"
                 android:layout_height="2dp"
                 android:layout_marginTop="6dp"
-                android:background="@color/g_hair">
+                android:background="?attr/gHair">
 
                 <View
                     android:id="@+id/grade_color_bar"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
-                    android:background="@color/g_ink" />
+                    android:background="?attr/gInk" />
             </FrameLayout>
         </LinearLayout>
     </LinearLayout>
@@ -86,5 +86,5 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="1px"
-        android:background="@color/g_hair" />
+        android:background="?attr/gHair" />
 </LinearLayout>

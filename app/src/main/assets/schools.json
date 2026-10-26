@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "dataVersion": "2026.10.26-1",
+  "schools": [
+    {
+      "id": "ecut",
+      "name": "东华理工大学",
+      "aliases": ["东华理工", "ECUT"],
+      "vendor": "zhengfang",
+      "jwBase": "https://172-20-130-13.atrust.ecut.edu.cn/jwglxt/",
+      "access": "atrust",
+      "loginUrl": "https://atrust1.ecut.edu.cn/portal/#/app_center",
+      "hosts": ["*.ecut.edu.cn", "172.20.130.13"],
+      "verified": true,
+      "ecutFeatures": true
+    }
+  ]
+}
