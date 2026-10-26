@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/g_paper"
+    android:background="?attr/gBg"
     android:orientation="vertical">
 
     <LinearLayout
@@ -21,7 +21,7 @@
             android:contentDescription="返回"
             android:gravity="center"
             android:text="‹"
-            android:textColor="@color/g_ink"
+            android:textColor="?attr/gInk"
             android:textSize="30sp" />
 
         <TextView
@@ -30,7 +30,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="添加课程"
-            android:textColor="@color/g_ink"
+            android:textColor="?attr/gInk"
             android:textSize="18sp"
             android:textStyle="bold" />
 
@@ -42,7 +42,7 @@
             android:insetBottom="0dp"
             android:text="保存"
             android:textSize="13sp"
-            app:cornerRadius="6dp" />
+            app:cornerRadius="?attr/gSmallRadius" />
     </LinearLayout>
 
     <ScrollView
@@ -61,10 +61,10 @@
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="@color/g_card"
-                app:cardCornerRadius="8dp"
+                app:cardBackgroundColor="?attr/gCard"
+                app:cardCornerRadius="?attr/gCardRadius"
                 app:cardElevation="0dp"
-                app:strokeColor="@color/g_line"
+                app:strokeColor="?attr/gLine"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
@@ -82,8 +82,8 @@
                         android:inputType="text"
                         android:paddingHorizontal="2dp"
                         android:singleLine="true"
-                        android:textColor="@color/g_ink"
-            android:textColorHint="@color/g_mute"
+                        android:textColor="?attr/gInk"
+            android:textColorHint="?attr/gMute"
                         android:textSize="14sp" />
 
                     <EditText
@@ -96,8 +96,8 @@
                         android:inputType="text"
                         android:paddingHorizontal="2dp"
                         android:singleLine="true"
-                        android:textColor="@color/g_ink"
-            android:textColorHint="@color/g_mute"
+                        android:textColor="?attr/gInk"
+            android:textColorHint="?attr/gMute"
                         android:textSize="14sp" />
 
                     <EditText
@@ -110,8 +110,8 @@
                         android:inputType="text"
                         android:paddingHorizontal="2dp"
                         android:singleLine="true"
-                        android:textColor="@color/g_ink"
-            android:textColorHint="@color/g_mute"
+                        android:textColor="?attr/gInk"
+            android:textColorHint="?attr/gMute"
                         android:textSize="14sp" />
 
                     <TextView
@@ -119,7 +119,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="16dp"
                         android:text="课程颜色"
-                        android:textColor="@color/g_ink"
+                        android:textColor="?attr/gInk"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
@@ -144,7 +144,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="上课时段"
-                    android:textColor="@color/g_ink"
+                    android:textColor="?attr/gInk"
                     android:textSize="16sp"
                     android:textStyle="bold" />
 
@@ -156,7 +156,7 @@
                     android:gravity="center"
                     android:paddingHorizontal="10dp"
                     android:text="+ 新增时段"
-                    android:textColor="@color/g_ink"
+                    android:textColor="?attr/gInk"
                     android:textSize="12.5sp"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -178,10 +178,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                app:cardBackgroundColor="@color/g_card"
-                app:cardCornerRadius="8dp"
+                app:cardBackgroundColor="?attr/gCard"
+                app:cardCornerRadius="?attr/gCardRadius"
                 app:cardElevation="0dp"
-                app:strokeColor="@color/g_line"
+                app:strokeColor="?attr/gLine"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
@@ -194,7 +194,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="星期"
-                        android:textColor="@color/g_ink"
+                        android:textColor="?attr/gInk"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
@@ -210,7 +210,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="16dp"
                         android:text="节次（固定双节）"
-                        android:textColor="@color/g_ink"
+                        android:textColor="?attr/gInk"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
@@ -231,8 +231,8 @@
                         android:inputType="text"
                         android:paddingHorizontal="2dp"
                         android:singleLine="true"
-                        android:textColor="@color/g_ink"
-            android:textColorHint="@color/g_mute"
+                        android:textColor="?attr/gInk"
+            android:textColorHint="?attr/gMute"
                         android:textSize="14sp" />
 
                     <TextView
@@ -240,7 +240,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="16dp"
                         android:text="上课周次"
-                        android:textColor="@color/g_ink"
+                        android:textColor="?attr/gInk"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
@@ -261,8 +261,8 @@
                         android:inputType="none"
                         android:paddingHorizontal="2dp"
                         android:singleLine="true"
-                        android:textColor="@color/g_ink"
-            android:textColorHint="@color/g_mute"
+                        android:textColor="?attr/gInk"
+            android:textColorHint="?attr/gMute"
                         android:textSize="13.5sp" />
 
                     <LinearLayout
@@ -278,7 +278,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:text="点选周次；连续模式先点起点再点终点"
-                        android:textColor="@color/g_mute"
+                        android:textColor="?attr/gMute"
                         android:textSize="11.5sp" />
 
                     <TextView
@@ -290,7 +290,7 @@
                         android:gravity="center"
                         android:paddingHorizontal="8dp"
                         android:text="删除此时段"
-                        android:textColor="@color/g_accent"
+                        android:textColor="?attr/gAccent"
                         android:textSize="12.5sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -303,7 +303,7 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:gravity="center"
                 android:text="删除整门课程"
-                android:textColor="@color/g_accent"
+                android:textColor="?attr/gAccent"
                 android:textSize="13sp"
                 android:visibility="gone" />
 

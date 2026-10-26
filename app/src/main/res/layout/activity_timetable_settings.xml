@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/g_paper"
+    android:background="?attr/gBg"
     android:orientation="vertical">
 
     <LinearLayout
@@ -21,7 +21,7 @@
             android:contentDescription="返回"
             android:gravity="center"
             android:text="‹"
-            android:textColor="@color/g_ink"
+            android:textColor="?attr/gInk"
             android:textSize="30sp" />
 
         <TextView
@@ -29,7 +29,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="课表设置"
-            android:textColor="@color/g_ink"
+            android:textColor="?attr/gInk"
             android:textSize="18sp"
             android:textStyle="bold" />
 
@@ -41,7 +41,7 @@
             android:insetBottom="0dp"
             android:text="保存"
             android:textSize="13sp"
-            app:cornerRadius="6dp" />
+            app:cornerRadius="?attr/gSmallRadius" />
     </LinearLayout>
 
     <ScrollView
@@ -61,10 +61,10 @@
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="@color/g_card"
-                app:cardCornerRadius="8dp"
+                app:cardBackgroundColor="?attr/gCard"
+                app:cardCornerRadius="?attr/gCardRadius"
                 app:cardElevation="0dp"
-                app:strokeColor="@color/g_line"
+                app:strokeColor="?attr/gLine"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
@@ -77,7 +77,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="学期第一周周一"
-                        android:textColor="@color/g_ink"
+                        android:textColor="?attr/gInk"
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
@@ -86,11 +86,11 @@
                         android:layout_width="match_parent"
                         android:layout_height="48dp"
                         android:layout_marginTop="10dp"
-                        android:background="@color/g_paper"
+                        android:background="?attr/gBg"
                         android:gravity="center_vertical"
                         android:paddingHorizontal="14dp"
                         android:text="未设置"
-                        android:textColor="@color/g_ink"
+                        android:textColor="?attr/gInk"
                         android:textSize="14sp" />
 
                     <TextView
@@ -100,7 +100,7 @@
                         android:id="@+id/tv_total_weeks_label"
                         android:visibility="gone"
                         android:text="学期总周数"
-                        android:textColor="@color/g_ink"
+                        android:textColor="?attr/gInk"
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
@@ -115,8 +115,8 @@
                         android:maxLength="2"
                         android:paddingHorizontal="2dp"
                         android:text="20"
-                        android:textColor="@color/g_ink"
-            android:textColorHint="@color/g_mute"
+                        android:textColor="?attr/gInk"
+            android:textColorHint="?attr/gMute"
                         android:textSize="14sp" />
 
                     <TextView
@@ -124,7 +124,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="16dp"
                         android:text="显示天数"
-                        android:textColor="@color/g_ink"
+                        android:textColor="?attr/gInk"
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
@@ -132,7 +132,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="48dp"
                         android:layout_marginTop="10dp"
-                        android:background="@color/g_paper"
+                        android:background="?attr/gBg"
                         android:orientation="horizontal"
                         android:padding="4dp">
 
@@ -141,10 +141,10 @@
                             android:layout_width="0dp"
                             android:layout_height="match_parent"
                             android:layout_weight="1"
-                            android:background="@color/g_card"
+                            android:background="?attr/gCard"
                             android:gravity="center"
                             android:text="七天"
-                            android:textColor="@color/g_ink"
+                            android:textColor="?attr/gInk"
                             android:textSize="13.5sp"
                             android:textStyle="bold" />
 
@@ -155,7 +155,7 @@
                             android:layout_weight="1"
                             android:gravity="center"
                             android:text="五天"
-                            android:textColor="@color/g_mute"
+                            android:textColor="?attr/gMute"
                             android:textSize="13.5sp" />
                     </LinearLayout>
 
@@ -176,7 +176,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="显示非本周课程"
-                                android:textColor="@color/g_ink"
+                                android:textColor="?attr/gInk"
                                 android:textSize="15sp"
                                 android:textStyle="bold" />
 
@@ -185,7 +185,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
                                 android:text="关闭后只显示当前查看周实际有课的课程"
-                                android:textColor="@color/g_mute"
+                                android:textColor="?attr/gMute"
                                 android:textSize="11.5sp" />
                         </LinearLayout>
 
@@ -201,8 +201,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                app:cardBackgroundColor="@color/g_chip"
-                app:cardCornerRadius="8dp"
+                app:cardBackgroundColor="?attr/gChip"
+                app:cardCornerRadius="?attr/gCardRadius"
                 app:cardElevation="0dp"
                 app:strokeWidth="0dp">
 
@@ -216,7 +216,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="当前教学周预览"
-                        android:textColor="@color/g_ink"
+                        android:textColor="?attr/gInk"
                         android:textSize="12.5sp"
                         android:textStyle="bold" />
 
@@ -226,7 +226,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="第 1 周"
-                        android:textColor="@color/g_ink"
+                        android:textColor="?attr/gInk"
                         android:textSize="16sp"
                         android:textStyle="bold" />
 
@@ -236,7 +236,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
                         android:text="首节课：暂无"
-                        android:textColor="@color/g_ink"
+                        android:textColor="?attr/gInk"
                         android:textSize="12.5sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>

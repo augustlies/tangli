@@ -173,4 +173,50 @@ public class TangliCommandTest {
         remote.semester.id = "2026-2027-1";
         assertEquals(1, TimetableStore.merge(local, remote).adjusts.size());
     }
+    @Test
+    public void addSameSlotWithRoomUpdatesInsteadOfSkipping() {
+        Timetable once = TangliCommand.plan("烫梨指令 v1\n+ 地质学 | 周一 | 1-2节 | 第1周", base(), env()).result;
+        TangliCommand.Plan again = TangliCommand.plan("烫梨指令 v1\n+ 地质学 | 周一 | 1-2节 | 第1周 | 3-402", once, env());
+        assertEquals(1, again.changeCount());
+        Timetable.Course geo = again.result.findByName("地质学");
+        assertEquals(1, geo.sessions.size());
+        assertEquals("3-402", geo.sessions.get(0).location);
+        // 再发一次完全一样的：不算改动
+        assertEquals(0, TangliCommand.plan("烫梨指令 v1\n+ 地质学 | 周一 | 1-2节 | 第1周 | 3-402", again.result, env()).changeCount());
+    }
+    @Test
+    public void partialWeekRoomSplitsInsteadOfDuplicating() {
+        Timetable once = TangliCommand.plan("烫梨指令 v1\n+ 地质学 | 周一 | 1-2节 | 1-16周", base(), env()).result;
+        TangliCommand.Plan p = TangliCommand.plan("烫梨指令 v1\n+ 地质学 | 周一 | 1-2节 | 第1周 | 3-402", once, env());
+        assertEquals(1, p.changeCount());
+        Timetable.Course geo = p.result.findByName("地质学");
+        assertEquals(2, geo.sessions.size());
+        Timetable.Session rest = geo.sessions.get(0), w1 = geo.sessions.get(1);
+        assertEquals(15, rest.weeks.size());
+        assertFalse(rest.weeks.contains(1));
+        assertEquals("", rest.location);
+        assertEquals(java.util.Collections.singletonList(1), w1.weeks);
+        assertEquals("3-402", w1.location);
+        assertTrue(p.items.get(0).desc.contains("其余周不变"));
+    }
+
+    @Test
+    public void allWeeksRoomUpdatesWithoutExtendingWeeks() {
+        Timetable once = TangliCommand.plan("烫梨指令 v1\n+ 地质学 | 周一 | 1-2节 | 1-16周", base(), env()).result;
+        TangliCommand.Plan p = TangliCommand.plan("烫梨指令 v1\n+ 地质学 | 周一 | 1-2节 | 全部 | 3-402", once, env());
+        Timetable.Course geo = p.result.findByName("地质学");
+        assertEquals(1, geo.sessions.size());
+        assertEquals(16, geo.sessions.get(0).weeks.size());
+        assertEquals("3-402", geo.sessions.get(0).location);
+    }
+
+    @Test
+    public void moveMultiWeekSplitsPerWeek() {
+        TangliCommand.Plan p = TangliCommand.plan("烫梨指令 v1\n调 大学英语 | 3-5周 | 周五 | 1-2节 -> 周六 | 3-4节", base(), env());
+        assertEquals(0, p.errorCount());
+        assertEquals(3, p.result.adjusts.size());
+        java.util.Set<Integer> weeks = new java.util.HashSet<>();
+        for (Timetable.Adjust a : p.result.adjusts) { weeks.add(a.week); assertEquals(a.week, a.toWeek); assertEquals(6, a.toDay); }
+        assertEquals(new java.util.HashSet<>(java.util.Arrays.asList(3, 4, 5)), weeks);
+    }
 }

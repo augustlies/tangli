@@ -292,26 +292,44 @@ xnm=2026&xqm=3&kzlx=ck
 
 ---
 
-## 4. 未来多校兼容预留
+## 4. 多学校（v1.2.4 起）
 
-`semester` 与 `courses` 结构对学校无感知，切换学校只需替换「抓取器」：
+`semester` 与 `courses` 结构对学校无感知，学校差异只在「从哪里抓、怎么解析」。
 
+### 学校配置 `assets/schools.json`
+
+```json
+{ "schemaVersion": 1, "dataVersion": "2026.10.26-1",
+  "schools": [{
+    "id": "ecut", "name": "东华理工大学",
+    "vendor": "zhengfang",            // zhengfang | qiangzhi | other
+    "jwBase": "https://172-20-130-13.atrust.ecut.edu.cn/jwglxt/",
+    "access": "atrust",               // direct | atrust | webvpn
+    "loginUrl": "https://atrust1.ecut.edu.cn/portal/#/app_center",
+    "hosts": ["*.ecut.edu.cn", "172.20.130.13"],   // *.x 同时匹配 x 本身
+    "verified": true, "ecutFeatures": true }]}
 ```
-JwglxtFetcher   （正方教务，当前）
-UrisFetcher     （URP 教务，预留）
-CustomFetcher   （纯手动，任何学校）
-```
 
-抓取器统一实现：
+- 解析：`data/SchoolProfile.parseList`，坏条目跳过，整份坏掉返回空列表；读不到时 App 内置东华理工兜底。
+- 当前学校：SharedPreferences `school_id`（缺省 `ecut`，老用户升级无感）；自定义学校存 `custom_school`（`SchoolProfile.toJson()`，id 固定为 `custom`）。
+- 自定义学校由 `SchoolProfile.custom(网址, 厂商或 null)` 生成：正方 `jwBase` 截到 `/jwglxt/`（部署在根目录时截到 `/xtgl/` 之前），强智截到 `/jsxsd/`；白名单 = 该主机 + 学校主域名（`*.abc.edu.cn`）。
+
+### 课表来源 `data/TimetableSource`
 
 ```java
-interface CampusFetcher {
-    String id();                                  // "jwglxt" / "urp" / "custom"
-    String displayName();
-    List<TargetStore.Target> defaultTargets();    // 该校的直达路径模板
-    Timetable parseTimetable(String html);        // 从页面提取课表
-    Grades parseGrades(String html);              // 从页面提取成绩
+interface TimetableSource {
+    SchoolProfile.Vendor vendor();
+    int detect(String url, String html);          // 0-100，纯函数
+    String timetableUrl(SchoolProfile p);         // 后台同步打开的页面
+    boolean isLoggedInPage(String url);
+    boolean isLoginPage(String url);
+    String extractionJs(SchoolProfile p, String xnm, String xqm); // 在已登录 WebView 里取原始文本
+    JwglxtFetcher.Result parse(String raw);       // 纯 Java 解析
 }
 ```
 
-新增学校 = 新增一个 `CampusFetcher` 实现 + 一份 `default-targets.json`，**不改 UI 与存储层**。
+- `ZhengfangSource`：kbList JSON（`xskbcx_cxXsKb`，取不到时再试 `cxXsgrkb`），解析仍是 `JwglxtFetcher`。东华理工的同步 JS 与流程保持在 `CampusSyncClient` 原样不动。
+- `QiangzhiSource`：`jsxsd/xskb/xskb_list.do` 的 `#kbtable`，只解析 `div.kbcontent`，星期按表头 → div id → 列序，节次按 `[01-02节]` → 行表头。课程 key 为 `qiangzhi_<课名>_<教师>`，source 仍记 `jwglxt`（重新导入会替换）。
+- `TimetableSources.detect`：所有来源打分取最高，低于 40 视为认不出。
+- 认不出时可导出页面结构样本（`PageSample`，只含标签/id/class/字段名，去中文、长数字、邮箱、查询参数），存 `diag/page_sample.json` 并附在诊断日志里。
+- 成绩只支持正方（`SchoolProfile.supportsGrades()`）。
