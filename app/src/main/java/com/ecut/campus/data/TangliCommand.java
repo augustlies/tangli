@@ -485,11 +485,13 @@ public final class TangliCommand {
         for (Timetable.Course c : t.courses) {
             if (!c.name.equals(name)) continue;
             for (Timetable.Session e : c.sessions) {
-                if (sameSlot(e, s) && e.weeks.equals(s.weeks)) {
-                    it.changed = false;
-                    it.desc = "已存在，跳过：" + name + " " + slotText(s);
-                    return;
-                }
+                if (!sameSlot(e, s)) continue;
+                if (e.weeks.isEmpty()) for (int i = 1; i <= env.totalWeeks; i++) e.weeks.add(i);
+                List<Integer> inter = new ArrayList<>(e.weeks);
+                inter.retainAll(s.weeks);
+                if (inter.isEmpty()) continue;
+                mergeSameSlot(c, e, s, f, inter, name, it);
+                return;
             }
             if (!Timetable.SOURCE_JWGLXT.equals(c.source) && target == null) target = c;
         }
@@ -506,6 +508,84 @@ public final class TangliCommand {
         target.sessions.add(s);
         it.changed = true;
         it.desc = "添加 " + name + " · " + slotText(s) + (s.location.isEmpty() ? "" : " · " + s.location);
+    }
+
+    /**
+     * 同一门课、同一时段，新口令的周次和已有的有交集：按「新值覆盖、空值不动」合并，绝不并排多出一条。
+     *  - 新口令覆盖了原来所有周（或写的「全部」）：直接改原时段，多出来的周并进去；
+     *  - 只覆盖其中几周且带了新教室/老师：把这几周拆出来单独一条，其余周不变（「第 1 周换教室」）；
+     *  - 什么新信息都没有：只把新增的周并进去，没有新周就算重复。
+     */
+    private static void mergeSameSlot(Timetable.Course c, Timetable.Session e, Timetable.Session s, Fields f,
+                                      List<Integer> inter, String name, Item it) {
+        boolean jw = Timetable.SOURCE_JWGLXT.equals(c.source);
+        String curTeacher = e.teacher.isEmpty() ? c.teacher : e.teacher;
+        boolean newRoom = !f.location.isEmpty() && !f.location.equals(e.location);
+        boolean newTeacher = !f.teacher.isEmpty() && !f.teacher.equals(curTeacher);
+        List<Integer> extra = new ArrayList<>(s.weeks);
+        extra.removeAll(e.weeks);
+        if (f.allWeeks) extra.clear(); // 「全部」只表示这门课，不把周次扩到学期末
+        boolean coversAll = f.allWeeks || inter.size() == e.weeks.size();
+
+        List<String> upd = new ArrayList<>();
+        if (newRoom || newTeacher) {
+            Timetable.Session dst = e;
+            if (!coversAll) {
+                // 拆：原时段去掉这几周，这几周单独成一条
+                dst = copyOf(e);
+                e.weeks.removeAll(inter);
+                e.weeksRaw = weekExpr(e.weeks);
+                dst.weeks.clear();
+                dst.weeks.addAll(inter);
+                dst.weeksRaw = weekExpr(inter);
+                c.sessions.add(c.sessions.indexOf(e) + 1, dst);
+            }
+            if (newRoom) {
+                upd.add("教室 " + (dst.location.isEmpty() ? "" : dst.location + " → ") + f.location);
+                dst.location = f.location;
+            }
+            if (newTeacher) {
+                upd.add("老师 " + f.teacher);
+                if (coversAll && c.sessions.size() == 1 && !jw) c.teacher = f.teacher;
+                else dst.teacher = f.teacher;
+            }
+        }
+        if (!extra.isEmpty()) {
+            Timetable.Session grow = e;
+            if (!coversAll && (newRoom || newTeacher)) grow = c.sessions.get(c.sessions.indexOf(e) + 1);
+            for (int w : extra) if (!grow.weeks.contains(w)) grow.weeks.add(w);
+            Collections.sort(grow.weeks);
+            grow.weeksRaw = weekExpr(grow.weeks);
+            upd.add("加上第 " + weekExpr(extra) + " 周");
+        }
+        it.changed = !upd.isEmpty();
+        if (!it.changed) {
+            it.desc = "已存在，跳过：" + name + " " + slotText(s);
+            return;
+        }
+        String scope = coversAll || !(newRoom || newTeacher) ? "" : "第 " + weekExpr(inter) + " 周";
+        it.desc = "更新 " + name + " · " + slotText(e) + (scope.isEmpty() ? "" : " · " + scope)
+                + " · " + String.join("，", upd)
+                + (scope.isEmpty() ? "" : "，其余周不变")
+                + (jw ? "（教务课，重新同步会恢复）" : "");
+        it.warn = jw;
+    }
+
+    private static Timetable.Session copyOf(Timetable.Session e) {
+        Timetable.Session d = new Timetable.Session();
+        d.dayOfWeek = e.dayOfWeek;
+        d.startSection = e.startSection;
+        d.endSection = e.endSection;
+        d.weeks.addAll(e.weeks);
+        d.weeksRaw = e.weeksRaw;
+        d.location = e.location;
+        d.campus = e.campus;
+        d.roomType = e.roomType;
+        d.teacher = e.teacher;
+        d.weekTeachers.putAll(e.weekTeachers);
+        d.timeStart = e.timeStart;
+        d.timeEnd = e.timeEnd;
+        return d;
     }
 
     private static void remove(Timetable t, Env env, Fields f, Item it) throws CmdError {
@@ -613,6 +693,35 @@ public final class TangliCommand {
         if (arrow < 0) throw new CmdError("调课要写成「原时间 -> 新时间」");
         Fields from = parseFields(body.substring(0, arrow), env);
         Fields to = parseFields(body.substring(arrow + 1), env);
+        int toWeeks = to.weeks == null ? 0 : to.weeks.size();
+        if (from.weeks != null && from.weeks.size() > 1 && from.dates.isEmpty() && !from.allWeeks) {
+            // 「高数 | 3-5周 | 周一 | 1-2节 -> 周五」：拆成每周一条；新周次写了同样多周就一一对应
+            if (toWeeks > 1 && toWeeks != from.weeks.size()) throw new CmdError("原来 " + from.weeks.size() + " 周、调到 " + toWeeks + " 周，对不上");
+            List<Integer> ws = new ArrayList<>(from.weeks);
+            List<Integer> tws = to.weeks == null ? null : new ArrayList<>(to.weeks);
+            int added = 0;
+            for (int i = 0; i < ws.size(); i++) {
+                from.weeks = new ArrayList<>(Collections.singletonList(ws.get(i)));
+                if (tws != null && tws.size() > 1) to.weeks = new ArrayList<>(Collections.singletonList(tws.get(i)));
+                else if (tws == null || tws.isEmpty()) to.weeks = null;
+                Item one = new Item();
+                moveOne(t, env, from, to, one);
+                if (one.changed) added++;
+            }
+            it.changed = added > 0;
+            String toLoc = !to.location.isEmpty() ? to.location : (!to.texts.isEmpty() ? to.texts.get(0) : "");
+            it.desc = (it.changed ? "" : "已存在，跳过：") + "调课 " + from.name() + " · 第" + weekExpr(ws) + "周"
+                    + Dates.cnDay(from.day) + secText(from) + " → "
+                    + (tws != null && tws.size() > 1 ? "第" + weekExpr(tws) + "周" : "同周")
+                    + Dates.cnDay(to.day > 0 ? to.day : from.day) + secText(to)
+                    + (toLoc.isEmpty() ? "" : " · " + toLoc) + "（共 " + ws.size() + " 次）";
+            return;
+        }
+        if (toWeeks > 1) throw new CmdError("一次只能调到一周（多周请分多行）");
+        moveOne(t, env, from, to, it);
+    }
+
+    private static void moveOne(Timetable t, Env env, Fields from, Fields to, Item it) throws CmdError {
         Timetable.Adjust a = source(t, env, from, Timetable.Adjust.MOVE);
         if (!to.dates.isEmpty()) {
             if (!Dates.valid(env.start)) throw new CmdError("没设开学日期，日期换算不了周次");
@@ -891,7 +1000,14 @@ public final class TangliCommand {
 
     /** 加入临时安排；已有一模一样的返回 false。 */
     public static boolean addAdjust(Timetable t, Timetable.Adjust a) {
-        for (Timetable.Adjust e : t.adjusts) if (e.sameAs(a)) return false;
+        for (Timetable.Adjust e : t.adjusts) {
+            if (!e.sameAs(a)) continue;
+            // 同一次调课/停课再发一次：带了新教室或备注就更新，否则算重复
+            boolean upd = false;
+            if (!a.toLocation.isEmpty() && !a.toLocation.equals(e.toLocation)) { e.toLocation = a.toLocation; upd = true; }
+            if (!a.note.isEmpty() && !a.note.equals(e.note)) { e.note = a.note; upd = true; }
+            return upd;
+        }
         if (a.id.isEmpty()) a.id = "a" + Long.toString(System.nanoTime() & 0xFFFFFFFFL, 36) + t.adjusts.size();
         t.adjusts.add(a);
         return true;

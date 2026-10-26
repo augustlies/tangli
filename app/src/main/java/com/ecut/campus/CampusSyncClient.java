@@ -17,6 +17,12 @@ import android.webkit.WebViewClient;
 import com.ecut.campus.data.Grades;
 import com.ecut.campus.data.GradesStore;
 import com.ecut.campus.data.JwglxtFetcher;
+import com.ecut.campus.data.QiangzhiGrades;
+import com.ecut.campus.data.QiangzhiSource;
+import com.ecut.campus.data.TermStartProbe;
+import com.ecut.campus.data.SchoolProfile;
+import com.ecut.campus.data.TimetableSource;
+import com.ecut.campus.data.ZhengfangSource;
 import com.ecut.campus.data.SemesterArchive;
 import com.ecut.campus.data.Timetable;
 import com.ecut.campus.data.TimetableStore;
@@ -80,6 +86,9 @@ public final class CampusSyncClient {
     private final Callback callback;
     private final String targetXnm;
     private final String targetXqm;
+    /** 当前学校；东华理工走原来的零信任 + 办事大厅流程，其他学校直连自己的教务。 */
+    private final SchoolProfile school;
+    private final TimetableSource source;
 
     private boolean finished;
     private boolean cardClicked;
@@ -93,7 +102,7 @@ public final class CampusSyncClient {
     private int gradeReadAttempts;
 
     private final Runnable timeout = () -> {
-        if (!finished) fail("同步超时，请确认统一门户登录仍有效");
+        if (!finished) fail("同步超时，请确认" + loginLabel() + "登录仍有效");
     };
 
     private final Runnable poll = new Runnable() {
@@ -118,6 +127,8 @@ public final class CampusSyncClient {
         this.callback = callback;
         this.targetXnm = xnm;
         this.targetXqm = xqm;
+        this.school = Schools.current(appContext);
+        this.source = Schools.source(school);
     }
 
     /** 必须在主线程调用，并先把 WebView 附着到当前 Activity 的不可见容器。 */
@@ -134,7 +145,8 @@ public final class CampusSyncClient {
         CampusSyncClient client = new CampusSyncClient(view, kind, xnm, xqm, callback);
         client.running = true;
         DiagLog.log(view.getContext(), "sync", "开始同步 " + kind.label
-                + (xnm != null ? " xnm=" + xnm + " xqm=" + xqm : ""));
+                + (xnm != null ? " xnm=" + xnm + " xqm=" + xqm : "")
+                + " · " + client.school.diagSummary());
         client.configure();
         client.load();
         return client;
@@ -168,6 +180,10 @@ public final class CampusSyncClient {
                 dlog(kind.label + " finished: " + url);
                 if (finished) return;
                 if (url == null) return;
+                if (!school.isEcut()) {
+                    onOtherSchoolPage(url);
+                    return;
+                }
                 capturePortalHost(url);
 
                 if (isLoginPage(url)) {
@@ -257,12 +273,74 @@ public final class CampusSyncClient {
     }
 
     private void load() {
+        if (!school.isEcut()) {
+            loadOtherSchool();
+            return;
+        }
         handler.postDelayed(timeout, NAVIGATION_TIMEOUT_MS);
         // 没有缓存节点时直接用学校固定的零信任教务节点；直达被要求登录再走办事大厅。
         directAttempted = true;
         String url = targetUrl(hostOrDefault(), kind);
         dlog(kind.label + " direct: " + url);
         webView.loadUrl(url);
+    }
+
+    /** 非东华理工：直接打开本校教务的课表/成绩页，靠 WebView 里保存的登录 Cookie。 */
+    private void loadOtherSchool() {
+        String url = null;
+        if (source != null) {
+            if (kind == Kind.TIMETABLE) {
+                url = source.timetableUrl(school);
+            } else if (school.supportsGrades()) {
+                url = school.vendor == SchoolProfile.Vendor.QIANGZHI
+                        ? QiangzhiGrades.gradesUrl(school) : ZhengfangSource.gradesUrl(school);
+            }
+        }
+        if (url == null) {
+            String msg = kind == Kind.GRADES ? "这个学校暂不支持成绩"
+                    : "这个学校暂不支持后台同步：打开教务网页进入课表页，点「导入此页课表」";
+            handler.post(() -> fail(msg));
+            return;
+        }
+        handler.postDelayed(timeout, NAVIGATION_TIMEOUT_MS);
+        directAttempted = true;
+        dlog(kind.label + " direct(" + school.vendor.key() + "): " + url);
+        webView.loadUrl(url);
+    }
+
+    private void onOtherSchoolPage(String url) {
+        if (source == null || dataRequested) return;
+        boolean onTarget;
+        if (kind == Kind.GRADES) {
+            onTarget = school.vendor == SchoolProfile.Vendor.QIANGZHI
+                    ? QiangzhiGrades.isGradesPage(url) : ZhengfangSource.isGradesPage(url);
+        } else if (school.vendor == SchoolProfile.Vendor.QIANGZHI) {
+            onTarget = QiangzhiSource.isTimetablePage(url);
+        } else {
+            onTarget = ZhengfangSource.isTimetablePage(url);
+        }
+        if (onTarget && !source.isLoginPage(url)) {
+            requestData();
+            return;
+        }
+        if (source.isLoginPage(url) || looksLikeCasLogin(url)) {
+            // 统一认证有时先经过登录页再自动跳回，等 5 秒还停在登录页才算失效。
+            handler.postDelayed(() -> {
+                String current = webView.getUrl();
+                if (finished || dataRequested || current == null) return;
+                if (source.isLoginPage(current) || looksLikeCasLogin(current)) {
+                    Prefs.setPortalSession(appContext, false);
+                    fail("教务系统登录已失效，请先在设置页重新登录");
+                }
+            }, 5_000L);
+        }
+    }
+
+    static boolean looksLikeCasLogin(String url) {
+        if (url == null) return false;
+        String u = url.toLowerCase(Locale.ROOT);
+        return u.contains("authserver/login") || u.contains("/cas/login")
+                || u.contains("/sso/login") || u.contains("login.action");
     }
 
     private void clickEhallCard() {
@@ -361,6 +439,10 @@ public final class CampusSyncClient {
     }
 
     private void extractTimetable() {
+        if (!school.isEcut()) {
+            extractOtherTimetable();
+            return;
+        }
         String xnmExpr = targetXnm != null && !targetXnm.isEmpty()
                 ? "'" + targetXnm.replace("'", "") + "'"
                 : "((yEl&&yEl.value)?yEl.value:'2026')";
@@ -397,36 +479,91 @@ public final class CampusSyncClient {
                 fail("课表解析为空，请稍后重试");
                 return;
             }
-            Timetable merged;
-            if (targetXnm != null && !targetXnm.isEmpty()) {
-                // 历史学期：合并进归档里该学期的既有数据，不动当前学期。
-                Timetable existing = SemesterArchive.loadSemester(
-                        appContext, result.timetable.semester.id);
-                merged = TimetableStore.merge(
-                        existing != null ? existing : new Timetable(), result.timetable);
-                if (!SemesterArchive.saveSemester(appContext, merged, false)) {
-                    fail("历史课表写入归档失败");
-                    return;
-                }
-            } else {
-                Timetable before = TimetableStore.load(appContext);
-                merged = TimetableStore.merge(before, result.timetable);
-                lastTimetableDiff = SyncDiff.summarize(before, merged);
-                if (!TimetableStore.save(appContext, merged)) {
-                    fail("课表写入本地失败");
-                    return;
-                }
-            }
-            SemesterArchive.unifyColors(appContext);
-            Prefs.setLastSyncTime(appContext, now());
-            dlog("Timetable saved: " + merged.courses.size()
-                    + " courses (" + result.rawRecords + " records)");
-            Prefs.setPortalSession(appContext, true);
-            finishSuccess(merged.courses.size());
+            saveTimetable(result);
         });
     }
 
+    /** 其他学校：按厂商取原始数据，解析后走同一套合并落盘。 */
+    private void extractOtherTimetable() {
+        String js = source.extractionJs(school, targetXnm, targetXqm);
+        webView.evaluateJavascript(js, raw -> {
+            String text = WebShellActivity.unwrapJsString(raw);
+            if (text == null || text.isEmpty() || text.startsWith("ERR:")) {
+                fail("课表接口没有返回数据");
+                return;
+            }
+            JwglxtFetcher.Result result = source.parse(text);
+            if (school.vendor == SchoolProfile.Vendor.ZHENGFANG) DiagLog.saveKbList(appContext, text);
+            DiagLog.log(appContext, "sync", "课表解析(" + school.vendor.key() + "): 学期="
+                    + result.timetable.semester.id
+                    + " 原始=" + result.rawRecords + " 课程=" + result.courseCount
+                    + " 周次失败=" + result.failedWeekExpr + " 合并重复=" + result.mergedDuplicates
+                    + (result.warnings.isEmpty() ? "" : " " + result.warnings));
+            if (!result.ok()) {
+                fail(text.startsWith("NOTABLE") ? "没找到课表，可能需要重新登录教务系统"
+                        : "课表解析为空，请稍后重试");
+                return;
+            }
+            probeTermStartThenSave(result);
+        });
+    }
+
+    /** 还没有开学日期时，先从教务推出第 1 周周一，再落盘；探测失败不影响课表保存。 */
+    private void probeTermStartThenSave(JwglxtFetcher.Result result) {
+        String semId = result.timetable.semester.id;
+        Timetable local = (targetXnm != null && !targetXnm.isEmpty())
+                ? SemesterArchive.loadSemester(appContext, semId) : TimetableStore.load(appContext);
+        boolean localHasStart = local != null && local.semester != null
+                && (semId == null || semId.isEmpty() || semId.equals(local.semester.id))
+                && local.semester.startDate != null && !local.semester.startDate.isEmpty();
+        if (localHasStart) {
+            saveTimetable(result);
+            return;
+        }
+        webView.evaluateJavascript(TermStartProbe.probeJs(school.vendor, semId), raw -> {
+            if (finished) return;
+            String monday = TermStartProbe.detect(WebShellActivity.unwrapJsString(raw),
+                    WeekMath.todayDateLabel());
+            dlog("开学日探测: " + (monday.isEmpty() ? "没找到" : monday));
+            if (!monday.isEmpty()) result.timetable.semester.startDate = monday;
+            saveTimetable(result);
+        });
+    }
+
+    private void saveTimetable(JwglxtFetcher.Result result) {
+        Timetable merged;
+        if (targetXnm != null && !targetXnm.isEmpty()) {
+            // 历史学期：合并进归档里该学期的既有数据，不动当前学期。
+            Timetable existing = SemesterArchive.loadSemester(
+                    appContext, result.timetable.semester.id);
+            merged = TimetableStore.merge(
+                    existing != null ? existing : new Timetable(), result.timetable);
+            if (!SemesterArchive.saveSemester(appContext, merged, false)) {
+                fail("历史课表写入归档失败");
+                return;
+            }
+        } else {
+            Timetable before = TimetableStore.load(appContext);
+            merged = TimetableStore.merge(before, result.timetable);
+            lastTimetableDiff = SyncDiff.summarize(before, merged);
+            if (!TimetableStore.save(appContext, merged)) {
+                fail("课表写入本地失败");
+                return;
+            }
+        }
+        SemesterArchive.unifyColors(appContext);
+        Prefs.setLastSyncTime(appContext, now());
+        dlog("Timetable saved: " + merged.courses.size()
+                + " courses (" + result.rawRecords + " records)");
+        Prefs.setPortalSession(appContext, true);
+        finishSuccess(merged.courses.size());
+    }
+
     private void extractGrades() {
+        if (!school.isEcut() && school.vendor == SchoolProfile.Vendor.QIANGZHI) {
+            extractQiangzhiGrades();
+            return;
+        }
         String trigger = "(function(){" +
                 "try{" +
                 "window.__ecutReadGrades=function(){};" +
@@ -510,6 +647,37 @@ public final class CampusSyncClient {
                 if (gradeReadAttempts >= 2) fail("成绩解析为空，请稍后重试");
                 return;
             }
+            saveGrades(parsed);
+        });
+    }
+
+    /** 强智：一次 POST 拿全部学期成绩表，Java 按表头解析。 */
+    private void extractQiangzhiGrades() {
+        webView.evaluateJavascript(QiangzhiGrades.extractionJs(), raw -> {
+            if (finished) return;
+            String html = WebShellActivity.unwrapJsString(raw);
+            if ("__NOPERM__".equals(html)) {
+                fail("教务系统没开放成绩查询（可能评教没做完或查询未开放），在教务网页里能查到后再同步");
+                return;
+            }
+            if (html == null || html.isEmpty() || html.startsWith("ERR:") || html.startsWith("NOTABLE")) {
+                fail("没找到成绩表，可能需要重新登录教务系统");
+                return;
+            }
+            Grades parsed = QiangzhiGrades.parseHtml(html);
+            dlog("GRADE_ROWS(qiangzhi): " + html.length() + " chars, courses="
+                    + parsed.totalCourseCount() + ", semesters=" + parsed.semesters.size());
+            if (parsed.totalCourseCount() <= 0) {
+                fail(html.contains("dataList") ? "成绩表是空的：这个账号暂时还没有成绩"
+                        : "成绩解析为空，请稍后重试");
+                return;
+            }
+            saveGrades(parsed);
+        });
+    }
+
+    private void saveGrades(Grades parsed) {
+        {
             // 教务成绩是全量权威数据。直接覆盖而不是合并，避免旧演示数据
             // 或已撤销课程永久残留。
             parsed.updatedAt = new SimpleDateFormat(
@@ -541,7 +709,7 @@ public final class CampusSyncClient {
                     + " courses in " + parsed.semesters.size() + " semesters");
             Prefs.setPortalSession(appContext, true);
             finishSuccess(parsed.totalCourseCount());
-        });
+        }
     }
 
     private void checkEhallLogin() {
@@ -635,8 +803,8 @@ public final class CampusSyncClient {
                         && url.contains("%23%21%2Flogin"));
     }
 
-    private static boolean isAllowed(String url) {
-        return CampusUrlPolicy.isAllowedCampusUrl(url);
+    private boolean isAllowed(String url) {
+        return CampusUrlPolicy.isAllowedFor(school, url);
     }
 
     private void finishSuccess(int count) {
@@ -651,6 +819,11 @@ public final class CampusSyncClient {
     }
 
     /** 同步过程全程记到诊断日志（URL 参数、长数字会被脱敏）。 */
+    /** 超时提示里的称呼：东华理工是统一门户，其他学校是教务系统。 */
+    private String loginLabel() {
+        return school == null || school.isEcut() ? "统一门户" : "教务系统";
+    }
+
     private void dlog(String m) {
         Log.i(TAG, m);
         DiagLog.log(appContext, "sync", m);
