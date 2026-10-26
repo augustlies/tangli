@@ -529,41 +529,30 @@ public final class SemesterArchive {
         JSONArray arr = root.optJSONArray("timetables");
         if (arr == null) return;
 
-        // 第一遍：收集全部教务课程名，按首次出现顺序建映射
+        // 第一遍：每个课程名沿用它现在的颜色（当前学期优先），不按出现顺序重排，
+        // 这样每次同步后颜色是稳定的；各学期内部撞色由 applyKnown 里的 dedupe 再拆开。
         Map<String, Integer> knownColors = new LinkedHashMap<>();
-        int paletteSize = CourseColorAssigner.PALETTE_SIZE;
+        String activeId = root.optString(KEY_ACTIVE, "");
         List<Timetable> all = new ArrayList<>();
         for (int i = 0; i < arr.length(); i++) {
             JSONObject o = arr.optJSONObject(i);
             if (o == null) continue;
             try {
-                Timetable t = Timetable.fromJson(o);
-                all.add(t);
-                for (Timetable.Course c : t.courses) {
-                    if (!Timetable.SOURCE_JWGLXT.equals(c.source)) continue;
-                    String key = CourseColorAssigner.normalizeName(c.name);
-                    if (!key.isEmpty() && !knownColors.containsKey(key)) {
-                        knownColors.put(key, 0); // 占位，下一步统一分配
-                    }
-                }
+                all.add(Timetable.fromJson(o));
             } catch (JSONException e) {
                 Log.w(TAG, "unifyColors 读取失败跳过一个学期", e);
             }
         }
-
-        // 统一分配：第 N 个新名字拿第 N 个未占用色
-        boolean[] used = new boolean[paletteSize];
-        int cursor = 0;
-        for (String key : knownColors.keySet()) {
-            int pick = cursor % paletteSize;
-            if (used[pick]) {
-                for (int j = 0; j < paletteSize; j++) {
-                    if (!used[j]) { pick = j; break; }
-                }
+        List<Timetable> order = new ArrayList<>(all);
+        for (int i = 0; i < order.size(); i++) {
+            if (order.get(i).semester.id.equals(activeId)) { order.add(0, order.remove(i)); break; }
+        }
+        for (Timetable t : order) {
+            for (Timetable.Course c : t.courses) {
+                if (!Timetable.SOURCE_JWGLXT.equals(c.source) || c.colorTouched) continue;
+                String key = CourseColorAssigner.normalizeName(c.name);
+                if (!key.isEmpty()) knownColors.putIfAbsent(key, Math.abs(c.colorIndex) % CourseColorAssigner.PALETTE_SIZE);
             }
-            used[pick] = true;
-            knownColors.put(key, pick);
-            cursor++;
         }
 
         // 第二遍：应用并写回
@@ -581,7 +570,7 @@ public final class SemesterArchive {
             try { root.put("timetables", out); } catch (JSONException ignored) {}
             writeRoot(ctx, root);
             // 当前学期镜像也要刷新
-            String activeId = root.optString(KEY_ACTIVE, "");
+            activeId = root.optString(KEY_ACTIVE, "");
             if (!activeId.isEmpty()) syncActiveMirror(ctx, activeId);
         }
     }

@@ -41,13 +41,14 @@ final class CommandUi {
 
     static TangliCommand.Env env(Context ctx, Timetable t) {
         TangliCommand.Env e = new TangliCommand.Env();
-        String start = WeekMath.effectiveStart(Prefs.semesterStartDate(ctx), t == null ? "" : t.semester.id);
+        String start = WeekMath.effectiveStart(Prefs.semesterStartDate(ctx), t == null ? "" : t.semester.id,
+                Schools.current(ctx).isEcut());
         e.start = start == null || start.isEmpty() ? "" : WeekMath.normalizeToMonday(start);
         e.today = WeekMath.todayDateLabel();
         e.totalWeeks = Prefs.storedTotalWeeks(ctx);
         e.settings = AppActions.currentSettings(ctx);
         ScheduleSettings ss = ScheduleSettingsStore.load(ctx);
-        int n = ScheduleSettings.SECTION_COUNT;
+        int n = ss.sectionCount();
         e.sectionStart = new int[n + 1];
         e.sectionEnd = new int[n + 1];
         for (int i = 1; i <= n; i++) {
@@ -60,7 +61,7 @@ final class CommandUi {
     private static String sectionTimes(Context ctx) {
         ScheduleSettings ss = ScheduleSettingsStore.load(ctx);
         StringBuilder sb = new StringBuilder();
-        for (int i = 1; i <= ScheduleSettings.SECTION_COUNT; i++) {
+        for (int i = 1; i <= ss.sectionCount(); i++) {
             sb.append("第").append(i).append("节 ").append(ss.startTime(i)).append('-').append(ss.endTime(i)).append('\n');
         }
         return sb.toString();
@@ -485,7 +486,7 @@ final class CommandUi {
         for (int i = 0; i < maxWeek; i++) wl[i] = "第" + (i + 1) + "周";
         String[] dl = new String[7];
         for (int i = 0; i < 7; i++) dl[i] = Dates.cnDay(i + 1);
-        String[] sl = new String[ScheduleSettings.SECTION_COUNT];
+        String[] sl = new String[ScheduleSettingsStore.load(a).sectionCount()];
         for (int i = 0; i < sl.length; i++) sl[i] = "第" + (i + 1) + "节";
 
         NumberPicker pw = picker(a, 1, maxWeek, week, wl);

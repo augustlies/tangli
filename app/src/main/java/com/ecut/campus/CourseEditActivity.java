@@ -37,6 +37,8 @@ public class CourseEditActivity extends AppCompatActivity {
     public static final String EXTRA_SESSION_INDEX = "session_index";
     public static final String EXTRA_DEFAULT_DAY = "default_day";
     public static final String EXTRA_DEFAULT_SECTION = "default_section";
+    /** 在课表空白处拖出来的结束节；没有时按起始节默认。 */
+    public static final String EXTRA_DEFAULT_END_SECTION = "default_end_section";
     public static final String EXTRA_CURRENT_WEEK = "current_week";
 
     private static final String[] DAY_LABELS = {"一", "二", "三", "四", "五", "六", "日"};
@@ -160,13 +162,15 @@ public class CourseEditActivity extends AppCompatActivity {
                 selectedSessionIndex = highlightSessionIndex;
             }
         } else {
-            selectedColor = timetable.courses.size() % TimetableView.PALETTE_BG.length;
+            selectedColor = com.ecut.campus.data.CourseColorAssigner.firstFree(timetable);
             Timetable.Session s = new Timetable.Session();
             s.dayOfWeek = getIntent().getIntExtra(EXTRA_DEFAULT_DAY, WeekMath.todayDayOfWeek());
             int defStart = getIntent().getIntExtra(EXTRA_DEFAULT_SECTION, 1);
-            s.startSection = clamp(defStart, 1, 10);
+            s.startSection = clamp(defStart, 1, maxSec());
             // 点在单数节默认两节，点在双数节默认只占这一节；编辑页里可以逐节加减
-            s.endSection = (s.startSection % 2 == 1) ? Math.min(10, s.startSection + 1) : s.startSection;
+            s.endSection = (s.startSection % 2 == 1) ? Math.min(maxSec(), s.startSection + 1) : s.startSection;
+            int drawnEnd = getIntent().getIntExtra(EXTRA_DEFAULT_END_SECTION, -1);
+            if (drawnEnd >= s.startSection) s.endSection = clamp(drawnEnd, s.startSection, maxSec());
             s.weeks.add(currentWeek);
             s.weeksRaw = String.valueOf(currentWeek);
             draftSessions.add(s);
@@ -184,8 +188,21 @@ public class CourseEditActivity extends AppCompatActivity {
 
     private void renderColorRow() {
         colorRow.removeAllViews();
-        for (int i = 0; i < TimetableView.PALETTE_BG.length; i++) {
+        colorRow.setOrientation(LinearLayout.VERTICAL);
+        int n = TimetableView.PALETTE_BG.length;
+        int perRow = 8;
+        LinearLayout line = null;
+        for (int i = 0; i < n; i++) {
+            if (i % perRow == 0) {
+                line = new LinearLayout(this);
+                line.setOrientation(LinearLayout.HORIZONTAL);
+                LinearLayout.LayoutParams ll = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                if (i > 0) ll.topMargin = dp(8);
+                colorRow.addView(line, ll);
+            }
             final int idx = i;
+            int fill = G.GLASS ? TimetableView.PALETTE_GLASS[idx] : TimetableView.PALETTE_BG[idx];
             TextView dot = new TextView(this);
             dot.setGravity(Gravity.CENTER);
             dot.setText(idx == selectedColor ? "✓" : "");
@@ -194,19 +211,21 @@ public class CourseEditActivity extends AppCompatActivity {
 
             GradientDrawable circle = new GradientDrawable();
             circle.setShape(GradientDrawable.OVAL);
-            circle.setColor(TimetableView.PALETTE_BG[idx]);
+            circle.setColor(fill);
             circle.setStroke(dp(idx == selectedColor ? 2 : 1), TimetableView.PALETTE_FG[idx]);
             dot.setBackground(circle);
 
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(32), dp(32));
-            lp.setMarginEnd(dp(8));
-            dot.setLayoutParams(lp);
+            // 8 个一行均分宽度，圆点本身固定 30dp
+            android.widget.FrameLayout cell = new android.widget.FrameLayout(this);
+            android.widget.FrameLayout.LayoutParams dl = new android.widget.FrameLayout.LayoutParams(dp(30), dp(30));
+            dl.gravity = Gravity.CENTER;
+            cell.addView(dot, dl);
+            line.addView(cell, new LinearLayout.LayoutParams(0, dp(34), 1f));
             dot.setOnClickListener(v -> {
                 selectedColor = idx;
                 dirty = true;
                 renderColorRow();
             });
-            colorRow.addView(dot);
         }
     }
 
@@ -246,8 +265,8 @@ public class CourseEditActivity extends AppCompatActivity {
         Timetable.Session s = currentSession();
         loadingForm = true;
         selectedDay = clamp(s.dayOfWeek, 1, 7);
-        selectedStart = clamp(s.startSection, 1, 10);
-        selectedEnd = clamp(Math.max(s.startSection, s.endSection), selectedStart, 10);
+        selectedStart = clamp(s.startSection, 1, maxSec());
+        selectedEnd = clamp(Math.max(s.startSection, s.endSection), selectedStart, maxSec());
         customTime = s.hasCustomTime();
         timeStart = customTime ? s.timeStart : "";
         timeEnd = customTime ? s.timeEnd : "";
@@ -315,13 +334,13 @@ public class CourseEditActivity extends AppCompatActivity {
             row.addView(stepper("从第 " + selectedStart + " 节", () -> {
                 if (selectedStart > 1) selectedStart--;
             }, () -> {
-                if (selectedStart < 10) selectedStart++;
+                if (selectedStart < maxSec()) selectedStart++;
                 if (selectedEnd < selectedStart) selectedEnd = selectedStart;
             }));
             row.addView(stepper("到第 " + selectedEnd + " 节", () -> {
                 if (selectedEnd > selectedStart) selectedEnd--;
             }, () -> {
-                if (selectedEnd < 10) selectedEnd++;
+                if (selectedEnd < maxSec()) selectedEnd++;
             }));
         } else {
             TextView a = segment("开始 " + timeStart, false);
@@ -397,7 +416,7 @@ public class CourseEditActivity extends AppCompatActivity {
     private void pickTime(boolean start) {
         int cur = Timetable.Session.minutesOf(start ? timeStart : timeEnd);
         if (cur < 0) cur = 8 * 60;
-        new android.app.TimePickerDialog(this, (view, h, m) -> {
+        GaugePickers.time(this, start ? "开始时间" : "结束时间", cur / 60, cur % 60, (h, m) -> {
             String v = Timetable.Session.formatHm(h * 60 + m);
             if (start) timeStart = v; else timeEnd = v;
             if (Timetable.Session.minutesOf(timeEnd) <= Timetable.Session.minutesOf(timeStart)) {
@@ -405,16 +424,21 @@ public class CourseEditActivity extends AppCompatActivity {
             }
             dirty = true;
             renderSectionSelector();
-        }, cur / 60, cur % 60, true).show();
+        });
     }
 
     /** 写入节次/时间。自定义时间同时换算出覆盖的节次，给空闲时间、分享等按节计算的功能用。 */
+    /** 当前作息每天几节（8–16）。 */
+    private int maxSec() {
+        return sched == null ? ScheduleSettings.DEFAULT_SECTION_COUNT : sched.sectionCount();
+    }
+
     private void applySectionsTo(Timetable.Session s) {
         if (customTime && Timetable.Session.minutesOf(timeStart) >= 0
                 && Timetable.Session.minutesOf(timeEnd) > Timetable.Session.minutesOf(timeStart)) {
             int a = Timetable.Session.minutesOf(timeStart), b = Timetable.Session.minutesOf(timeEnd);
-            int first = 10, last = 1;
-            for (int sec = 1; sec <= 10; sec++) {
+            int first = maxSec(), last = 1;
+            for (int sec = 1; sec <= maxSec(); sec++) {
                 if (sched.endMinutes(sec) > a && sched.startMinutes(sec) < b) {
                     first = Math.min(first, sec);
                     last = Math.max(last, sec);
