@@ -3,11 +3,11 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/g_paper"
+    android:background="?attr/gBg"
     android:clipToPadding="false"
     android:paddingHorizontal="18dp"
     android:paddingTop="16dp"
-    android:paddingBottom="76dp">
+    android:paddingBottom="92dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -18,8 +18,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:fontFamily="sans-serif-medium"
-            android:text="DNS 护盾中心"
-            android:textColor="@color/g_ink"
+            android:text="DNS 护盾"
+            android:textColor="?attr/gInk"
             android:textSize="24sp"
             android:textStyle="bold" />
 
@@ -28,16 +28,19 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            app:cardBackgroundColor="@color/g_chip"
-            app:cardCornerRadius="8dp"
+            app:cardBackgroundColor="?attr/gChip"
+            app:cardCornerRadius="?attr/gCardRadius"
             app:cardElevation="0dp"
             app:strokeWidth="0dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
                 android:orientation="vertical"
-                android:padding="22dp">
+                android:paddingHorizontal="20dp"
+                android:paddingTop="18dp"
+                android:paddingBottom="20dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -49,11 +52,12 @@
                         android:id="@+id/tv_shield_badge"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:background="@color/g_ink_18"
+                        android:background="?attr/gInk08"
+                        android:fontFamily="monospace"
                         android:paddingHorizontal="10dp"
                         android:paddingVertical="3dp"
-                        android:text="TUNNEL · 10.0.0.1/32"
-                        android:textColor="@color/g_ink"
+                        android:text="○ STANDBY"
+                        android:textColor="?attr/gInk"
                         android:textSize="11sp"
                         android:textStyle="bold" />
 
@@ -66,11 +70,17 @@
                         android:id="@+id/tv_shield_mode_hint"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
                         android:text="0.0.0.0 静默黑洞"
-                        android:textColor="@color/g_sub"
-                        android:textSize="11sp"
-                        android:textStyle="bold" />
+                        android:textColor="?attr/gSub"
+                        android:textSize="11sp" />
                 </LinearLayout>
+
+                <com.ecut.campus.view.ShieldRingView
+                    android:id="@+id/btn_toggle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp" />
 
                 <TextView
                     android:id="@+id/status_text"
@@ -79,7 +89,7 @@
                     android:layout_marginTop="12dp"
                     android:fontFamily="sans-serif-medium"
                     android:text="@string/adblock_off"
-                    android:textColor="@color/g_ink"
+                    android:textColor="?attr/gInk"
                     android:textSize="22sp"
                     android:textStyle="bold" />
 
@@ -87,22 +97,46 @@
                     android:id="@+id/status_subtext"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="5dp"
-                    android:fontFamily="sans-serif"
-                    android:text="点击下方按钮启动本地虚拟 DNS 隧道"
-                    android:textColor="@color/g_sub"
+                    android:layout_marginTop="4dp"
+                    android:text="点一下护盾开启本地 DNS 拦截"
+                    android:textColor="?attr/gSub"
                     android:textSize="13sp" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_toggle"
+                <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="52dp"
+                    android:layout_height="wrap_content"
                     android:layout_marginTop="18dp"
-                    android:fontFamily="sans-serif-medium"
-                    android:text="@string/adblock_start"
-                    android:textSize="15sp"
-                    android:textStyle="bold"
-                    app:cornerRadius="6dp" />
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_dns_pause"
+                        style="@style/Gauge.Button.Outline"
+                        android:layout_width="0dp"
+                        android:layout_height="46dp"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:text="暂停 30 分钟"
+                        android:textSize="13sp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_dns_test"
+                        style="@style/Gauge.Button.Outline"
+                        android:layout_width="0dp"
+                        android:layout_height="46dp"
+                        android:layout_weight="1"
+                        android:text="测试一下"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tv_dns_test_result"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center"
+                    android:textColor="?attr/gSub"
+                    android:textSize="12.5sp"
+                    android:visibility="gone" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -110,10 +144,97 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            app:cardBackgroundColor="@color/g_card"
-            app:cardCornerRadius="8dp"
+            app:cardBackgroundColor="?attr/gCard"
+            app:cardCornerRadius="?attr/gCardRadius"
             app:cardElevation="0dp"
-            app:strokeColor="@color/g_line"
+            app:strokeColor="?attr/gCardStroke"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="18dp"
+                android:paddingVertical="14dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="查一个域名"
+                    android:textColor="?attr/gInk"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="某个 App 打不开时，看看是不是被误拦了"
+                    android:textColor="?attr/gSub"
+                    android:textSize="12sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <EditText
+                        android:id="@+id/et_dns_lookup"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_gauge_input"
+                        android:hint="例如 ad.example.com"
+                        android:imeOptions="actionSearch"
+                        android:importantForAutofill="no"
+                        android:inputType="textUri"
+                        android:paddingHorizontal="12dp"
+                        android:singleLine="true"
+                        android:textColor="?attr/gInk"
+                        android:textColorHint="?attr/gMute"
+                        android:textSize="14sp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_dns_lookup"
+                        android:layout_width="wrap_content"
+                        android:layout_height="44dp"
+                        android:layout_marginStart="8dp"
+                        android:text="查"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tv_dns_lookup_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:textColor="?attr/gInk"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/tv_dns_lookup_detail"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textColor="?attr/gSub"
+                    android:textSize="12.5sp"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            app:cardBackgroundColor="?attr/gCard"
+            app:cardCornerRadius="?attr/gCardRadius"
+            app:cardElevation="0dp"
+            app:strokeColor="?attr/gCardStroke"
             app:strokeWidth="1dp">
 
             <LinearLayout
@@ -135,7 +256,7 @@
                         android:layout_height="wrap_content"
                         android:fontFamily="sans-serif-medium"
                         android:text="同时拦截统计与埋点域名"
-                        android:textColor="@color/g_ink"
+                        android:textColor="?attr/gInk"
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
@@ -145,7 +266,7 @@
                         android:layout_marginTop="2dp"
                         android:fontFamily="sans-serif"
                         android:text="额外拦截 82 条第三方日志/友盟统计域"
-                        android:textColor="@color/g_sub"
+                        android:textColor="?attr/gSub"
                         android:textSize="12sp" />
                 </LinearLayout>
 
@@ -167,10 +288,10 @@
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="8dp"
                 android:layout_weight="1"
-                app:cardBackgroundColor="@color/g_card"
-                app:cardCornerRadius="8dp"
+                app:cardBackgroundColor="?attr/gCard"
+                app:cardCornerRadius="?attr/gCardRadius"
                 app:cardElevation="0dp"
-                app:strokeColor="@color/g_line"
+                app:strokeColor="?attr/gCardStroke"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
@@ -186,7 +307,7 @@
                         android:layout_height="wrap_content"
                         android:fontFamily="sans-serif-medium"
                         android:text="54"
-                        android:textColor="@color/g_accent"
+                        android:textColor="?attr/gAccent"
                         android:textSize="24sp"
                         android:textStyle="bold" />
 
@@ -195,7 +316,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="3dp"
                         android:text="广告拦截"
-                        android:textColor="@color/g_sub"
+                        android:textColor="?attr/gSub"
                         android:textSize="12sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -205,10 +326,10 @@
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="8dp"
                 android:layout_weight="1"
-                app:cardBackgroundColor="@color/g_card"
-                app:cardCornerRadius="8dp"
+                app:cardBackgroundColor="?attr/gCard"
+                app:cardCornerRadius="?attr/gCardRadius"
                 app:cardElevation="0dp"
-                app:strokeColor="@color/g_line"
+                app:strokeColor="?attr/gCardStroke"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
@@ -224,7 +345,7 @@
                         android:layout_height="wrap_content"
                         android:fontFamily="sans-serif-medium"
                         android:text="82"
-                        android:textColor="@color/g_warn"
+                        android:textColor="?attr/gWarn"
                         android:textSize="24sp"
                         android:textStyle="bold" />
 
@@ -233,7 +354,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="3dp"
                         android:text="统计观察"
-                        android:textColor="@color/g_sub"
+                        android:textColor="?attr/gSub"
                         android:textSize="12sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -242,10 +363,10 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                app:cardBackgroundColor="@color/g_card"
-                app:cardCornerRadius="8dp"
+                app:cardBackgroundColor="?attr/gCard"
+                app:cardCornerRadius="?attr/gCardRadius"
                 app:cardElevation="0dp"
-                app:strokeColor="@color/g_line"
+                app:strokeColor="?attr/gCardStroke"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
@@ -261,7 +382,7 @@
                         android:layout_height="wrap_content"
                         android:fontFamily="sans-serif-medium"
                         android:text="190"
-                        android:textColor="@color/g_ok"
+                        android:textColor="?attr/gOk"
                         android:textSize="24sp"
                         android:textStyle="bold" />
 
@@ -270,7 +391,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="3dp"
                         android:text="业务白名单"
-                        android:textColor="@color/g_sub"
+                        android:textColor="?attr/gSub"
                         android:textSize="12sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>

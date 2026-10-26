@@ -19,9 +19,9 @@ public class ScheduleSettingsActivity extends AppCompatActivity {
 
     private ScheduleSettings settings;
     private EditText etFirstStart;
-    private final EditText[] durationInputs = new EditText[ScheduleSettings.SECTION_COUNT];
-    private final EditText[] breakInputs = new EditText[ScheduleSettings.SECTION_COUNT];
-    private final TextView[] previewViews = new TextView[ScheduleSettings.SECTION_COUNT];
+    private final EditText[] durationInputs = new EditText[ScheduleSettings.MAX_SECTIONS];
+    private final EditText[] breakInputs = new EditText[ScheduleSettings.MAX_SECTIONS];
+    private final TextView[] previewViews = new TextView[ScheduleSettings.MAX_SECTIONS];
     private LinearLayout container;
 
     @Override
@@ -40,7 +40,7 @@ public class ScheduleSettingsActivity extends AppCompatActivity {
         findViewById(R.id.btn_schedule_reset).setOnClickListener(v ->
                 new androidx.appcompat.app.AlertDialog.Builder(this)
                         .setTitle("恢复默认作息")
-                        .setMessage("将第 1-10 节的时长与课间休息全部恢复为默认值。")
+                        .setMessage("将每天节数恢复为 10 节，时长与课间休息全部恢复为默认值。")
                         .setNegativeButton("取消", null)
                         .setPositiveButton("恢复", (d, w) -> {
                             settings.resetToDefaults();
@@ -49,8 +49,16 @@ public class ScheduleSettingsActivity extends AppCompatActivity {
                         })
                         .show());
 
-        etFirstStart.setOnFocusChangeListener((v, hasFocus) -> {
-            if (!hasFocus) applyFirstStart();
+        // 第 1 节开始时间也改成滚轮选择，不弹键盘
+        etFirstStart.setFocusable(false);
+        etFirstStart.setCursorVisible(false);
+        etFirstStart.setOnClickListener(v -> {
+            int cur = ScheduleSettings.parseHm(etFirstStart.getText().toString().trim());
+            if (cur < 0) cur = 8 * 60;
+            GaugePickers.time(this, "第 1 节开始", cur / 60, cur % 60, (h, m) -> {
+                etFirstStart.setText(ScheduleSettings.formatHm(h * 60 + m));
+                applyFirstStart();
+            });
         });
 
         rebuildRows();
@@ -58,10 +66,122 @@ public class ScheduleSettingsActivity extends AppCompatActivity {
 
     private void rebuildRows() {
         container.removeAllViews();
-        for (int i = 0; i < ScheduleSettings.SECTION_COUNT; i++) {
+        java.util.Arrays.fill(durationInputs, null);
+        java.util.Arrays.fill(breakInputs, null);
+        java.util.Arrays.fill(previewViews, null);
+        addCountRow();
+        for (int i = 0; i < settings.sectionCount(); i++) {
             addSectionRow(i);
         }
         refreshPreview();
+    }
+
+    /**
+     * 改每天节数。调少时如果课表里还有更后面节次的课，先把这些课列出来让用户选，
+     * 不悄悄把选择改回去。
+     */
+    private void applySectionCount(int want) {
+        com.ecut.campus.data.Timetable tt = com.ecut.campus.data.TimetableStore.load(this);
+        int used = ScheduleSettings.maxSectionUsed(tt);
+        if (want < used) {
+            StringBuilder list = new StringBuilder();
+            int shown = 0, more = 0;
+            for (com.ecut.campus.data.Timetable.Course c : tt.courses) {
+                for (com.ecut.campus.data.Timetable.Session se : c.sessions) {
+                    if (se.endSection <= want) continue;
+                    if (shown < 6) {
+                        list.append("· ").append(c.name).append("  ").append(com.ecut.campus.data.Dates.cnDay(se.dayOfWeek))
+                                .append(" 第 ").append(se.startSection).append(se.endSection > se.startSection ? "-" + se.endSection : "")
+                                .append(" 节\n");
+                        shown++;
+                    } else more++;
+                }
+            }
+            if (more > 0) list.append("…还有 ").append(more).append(" 个时段\n");
+            final int keep = used;
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle("还有课排在第 " + (want + 1) + " 节以后")
+                    .setMessage(list.toString().trim() + "\n\n调成 " + want + " 节的话这些课会看不见。先把它们删掉或改到前面的节次，再来调少；或者先按 " + keep + " 节保存。")
+                    .setNegativeButton("不改了", null)
+                    .setPositiveButton("按 " + keep + " 节保存", (d, w) -> {
+                        setCount(keep);
+                    })
+                    .show();
+            return;
+        }
+        setCount(want);
+    }
+
+    private void setCount(int n) {
+        if (n == settings.sectionCount()) return;
+        if (n > settings.sectionCount()) settings.ensureCovers(n);
+        else settings.setSectionCount(n);
+        rebuildRows();
+    }
+
+    /** 每天几节：8–16 节，不同学校不一样。点开刻度拨盘选。 */
+    private void addCountRow() {
+        MaterialCardView card = new MaterialCardView(this);
+        LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        cardLp.bottomMargin = dp(14);
+        card.setLayoutParams(cardLp);
+        card.setCardBackgroundColor(G.CARD);
+        card.setRadius(dp(Math.round(G.CARD_RADIUS)));
+        card.setCardElevation(0);
+        card.setStrokeColor(G.CARD_STROKE);
+        card.setStrokeWidth(dp(1));
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(16), dp(14), dp(16), dp(14));
+        row.setBackgroundResource(Ui.selectable(this, false));
+
+        LinearLayout texts = new LinearLayout(this);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        TextView title = new TextView(this);
+        title.setText("每天几节课");
+        title.setTextSize(14f);
+        title.setTextColor(G.INK);
+        title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        texts.addView(title);
+        TextView sub = new TextView(this);
+        sub.setText("按你们学校的作息来，8–16 节；导入的课用到更后面的节次会自动加上（删课后不会自动缩回）");
+        sub.setTextSize(12f);
+        sub.setTextColor(G.SUB);
+        texts.addView(sub);
+        row.addView(texts, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView value = new TextView(this);
+        value.setText(settings.sectionCount() + " 节 ›");
+        value.setTextSize(15f);
+        value.setTextColor(G.INK);
+        value.setTypeface(android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD));
+        LinearLayout.LayoutParams vl = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        vl.setMarginStart(dp(12));
+        row.addView(value, vl);
+
+        row.setOnClickListener(v -> {
+            syncInputsToModel();
+            com.ecut.campus.view.RulerDialView dial = new com.ecut.campus.view.RulerDialView(this);
+            dial.configure(ScheduleSettings.MIN_SECTIONS, ScheduleSettings.MAX_SECTIONS, settings.sectionCount(), "节");
+            LinearLayout box = new LinearLayout(this);
+            box.setPadding(dp(8), dp(4), dp(8), 0);
+            box.addView(dial, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle("每天几节课")
+                    .setView(box)
+                    .setNegativeButton("取消", null)
+                    .setPositiveButton("确定", (d, w) -> {
+                        applySectionCount(dial.value());
+                    })
+                    .show();
+        });
+        card.addView(row);
+        container.addView(card);
     }
 
     private void addSectionRow(int index) {
@@ -73,9 +193,9 @@ public class ScheduleSettingsActivity extends AppCompatActivity {
         cardLp.bottomMargin = dp(8);
         card.setLayoutParams(cardLp);
         card.setCardBackgroundColor(G.CARD);
-        card.setRadius(dp(18));
+        card.setRadius(dp(Math.round(G.CARD_RADIUS)));
         card.setCardElevation(0);
-        card.setStrokeColor(G.LINE);
+        card.setStrokeColor(G.CARD_STROKE);
         card.setStrokeWidth(dp(1));
 
         LinearLayout row = new LinearLayout(this);
@@ -144,20 +264,40 @@ public class ScheduleSettingsActivity extends AppCompatActivity {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(66), dp(40));
         lp.setMarginEnd(dp(4));
         et.setLayoutParams(lp);
-        et.setOnFocusChangeListener((v, hasFocus) -> {
-            if (!hasFocus) {
-                syncInputsToModel();
-                refreshPreview();
-            }
-        });
+        // 不再弹键盘：点一下弹出刻度拨盘，左右拨动选分钟
+        et.setFocusable(false);
+        et.setCursorVisible(false);
+        et.setOnClickListener(v -> showDial(et, duration, index));
         return et;
+    }
+
+    private void showDial(EditText target, boolean duration, int index) {
+        int cur;
+        try { cur = Integer.parseInt(target.getText().toString().trim()); } catch (Exception e) { cur = duration ? 45 : 10; }
+        com.ecut.campus.view.RulerDialView dial = new com.ecut.campus.view.RulerDialView(this);
+        dial.configure(duration ? 5 : 0, duration ? 180 : 120, cur, "分钟");
+        LinearLayout box = new LinearLayout(this);
+        box.setPadding(dp(8), dp(4), dp(8), 0);
+        box.addView(dial, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("第 " + (index + 1) + " 节 · " + (duration ? "上课时长" : "课后休息"))
+                .setView(box)
+                .setNegativeButton("取消", null)
+                .setPositiveButton("确定", (d, w) -> {
+                    target.setText(String.valueOf(dial.value()));
+                    syncInputsToModel();
+                    refreshPreview();
+                })
+                .show();
     }
 
     private void syncInputsToModel() {
         String first = etFirstStart.getText().toString().trim();
         if (ScheduleSettings.parseHm(first) >= 0) settings.firstClassStart = first;
 
-        for (int i = 0; i < ScheduleSettings.SECTION_COUNT; i++) {
+        for (int i = 0; i < settings.sectionCount(); i++) {
+            if (durationInputs[i] == null || breakInputs[i] == null) continue;
             ScheduleSettings.Section sec = settings.section(i + 1);
             sec.durationMinutes = parseOr(trimmed(durationInputs[i]), sec.durationMinutes, 1, 300);
             sec.breakAfterMinutes = parseOr(trimmed(breakInputs[i]), sec.breakAfterMinutes, 0, 600);
@@ -166,7 +306,7 @@ public class ScheduleSettingsActivity extends AppCompatActivity {
 
     private void refreshPreview() {
         syncInputsToModel();
-        for (int i = 0; i < ScheduleSettings.SECTION_COUNT; i++) {
+        for (int i = 0; i < settings.sectionCount(); i++) {
             if (previewViews[i] != null) {
                 previewViews[i].setText(settings.rangeLabel(i + 1));
             }

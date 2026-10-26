@@ -68,7 +68,7 @@ public class AboutActivity extends AppCompatActivity {
 
         Ui.label(this, col, "LICENSE · 许可");
         LinearLayout c3 = Ui.card(this, col);
-        Ui.row(this, c3, "01", "MIT 开源许可", "可以自由使用、修改和分发", "↗ WEB",
+        Ui.row(this, c3, "01", "GPL-3.0 开源许可", "可自由使用和修改，改版须同样开源 · © August Lies", "↗ WEB",
                 v -> Updater.open(this, Updater.REPO_URL + "/blob/main/LICENSE"));
         Ui.row(this, c3, "02", "广告规则", "部分来自 anti-AD（MIT）", "↗ WEB",
                 v -> Updater.open(this, "https://github.com/privacy-protection-tools/anti-AD"));

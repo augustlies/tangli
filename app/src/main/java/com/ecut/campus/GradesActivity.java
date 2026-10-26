@@ -2,6 +2,7 @@ package com.ecut.campus;
 
 import android.content.Intent;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -53,6 +54,45 @@ public class GradesActivity extends AppCompatActivity {
         refresh();
     }
 
+    /** 本次打开时已经翻开的新成绩。 */
+    private final java.util.Set<String> revealed = new java.util.HashSet<>();
+
+    private void coverScore(TextView tv) {
+        tv.setText("翻开");
+        tv.setTextSize(12f);
+        tv.setTextColor(G.ON_INK);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(dp(G.GLASS ? 12 : 3));
+        bg.setColor(G.INK);
+        tv.setBackground(bg);
+        tv.setPadding(dp(10), dp(6), dp(10), dp(6));
+    }
+
+    /** 翻牌：绕竖轴转到一半换成真实分数，再转回来；刻度条随后长出来。 */
+    private void flipReveal(View box, Runnable showScore, View bar, int barW) {
+        box.setCameraDistance(8000 * getResources().getDisplayMetrics().density);
+        box.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
+        box.animate().rotationY(90f).setDuration(150)
+                .setInterpolator(new android.view.animation.AccelerateInterpolator())
+                .withEndAction(() -> {
+                    showScore.run();
+                    box.setRotationY(-90f);
+                    box.animate().rotationY(0f).setDuration(220)
+                            .setInterpolator(new android.view.animation.DecelerateInterpolator(1.6f))
+                            .withEndAction(() -> {
+                                android.animation.ValueAnimator grow = android.animation.ValueAnimator.ofInt(0, barW);
+                                grow.setDuration(360);
+                                grow.setInterpolator(new android.view.animation.DecelerateInterpolator());
+                                grow.addUpdateListener(a -> {
+                                    ViewGroup.LayoutParams l = bar.getLayoutParams();
+                                    l.width = (int) a.getAnimatedValue();
+                                    bar.setLayoutParams(l);
+                                });
+                                grow.start();
+                            }).start();
+                }).start();
+    }
+
     /** 本次打开时的新成绩，离开页面后才清掉，方便用户看清是哪几门。 */
     private final java.util.Set<String> newIds = new java.util.HashSet<>();
 
@@ -67,11 +107,21 @@ public class GradesActivity extends AppCompatActivity {
         refresh();
     }
 
-    @Override
-    protected void onPause() {
-        super.onPause();
-        Prefs.setNewGradeKeys(this, new java.util.ArrayList<>());
-        ((android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE)).cancel(2001);
+    /**
+     * 只把翻开过的那门从「新成绩」里去掉；没翻的下次进来还盖着、还带标记。
+     * 全部看完才收掉通知。
+     */
+    private void markSeen(String cid) {
+        java.util.List<String> keep = new java.util.ArrayList<>();
+        for (String k : Prefs.newGradeKeys(this)) {
+            int bar = k.indexOf('|');
+            String id = bar >= 0 ? k.substring(bar + 1) : k;
+            if (!id.equals(cid)) keep.add(k);
+        }
+        Prefs.setNewGradeKeys(this, keep);
+        if (keep.isEmpty()) {
+            ((android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE)).cancel(2001);
+        }
     }
 
     private void refresh() {
@@ -142,6 +192,7 @@ public class GradesActivity extends AppCompatActivity {
         }
 
         View emptyCard = findViewById(R.id.empty_grades_card);
+        bindSchoolSupport();
         if (emptyCard != null) {
             emptyCard.setVisibility(displayCourses.isEmpty() ? View.VISIBLE : View.GONE);
         }
@@ -176,17 +227,35 @@ public class GradesActivity extends AppCompatActivity {
 
             double v = cg.scoreValue != null ? cg.scoreValue : (cg.isPassed ? 85.0 : 50.0);
             boolean failed = !cg.isPassed || v < 60.0;
-            int ink = failed ? G.ACCENT : G.INK;
-            tvScore.setText(cg.score);
-            tvScore.setTextColor(ink);
+            int ink = failed ? G.alarm() : G.INK;
             // 非数字成绩（优秀/合格）字号收小，保持右侧刻度对齐
             boolean numeric = cg.score != null && cg.score.matches("[0-9.]+");
-            tvScore.setTextSize(numeric ? 22f : 14f);
-
-            bar.setBackgroundColor(ink);
+            int barW = Math.round(dp(56) * (float) Math.max(0.0, Math.min(100.0, v)) / 100f);
+            Runnable showScore = () -> {
+                tvScore.setText(cg.score);
+                tvScore.setTextColor(ink);
+                tvScore.setTextSize(numeric ? 22f : 14f);
+                tvScore.setBackground(null);
+                tvScore.setPadding(0, 0, 0, 0);
+                bar.setBackgroundColor(ink);
+            };
             ViewGroup.LayoutParams lp = bar.getLayoutParams();
-            lp.width = Math.round(dp(56) * (float) Math.max(0.0, Math.min(100.0, v)) / 100f);
-            bar.setLayoutParams(lp);
+            if (newIds.contains(cid) && !revealed.contains(cid)) {
+                // 新成绩先盖着：点一下翻开
+                coverScore(tvScore);
+                lp.width = 0;
+                bar.setLayoutParams(lp);
+                row.setOnClickListener(rv -> {
+                    if (revealed.contains(cid)) return;
+                    revealed.add(cid);
+                    markSeen(cid);
+                    flipReveal((View) tvScore.getParent(), showScore, bar, barW);
+                });
+            } else {
+                showScore.run();
+                lp.width = barW;
+                bar.setLayoutParams(lp);
+            }
 
             listBox.addView(row);
         }
@@ -234,14 +303,36 @@ public class GradesActivity extends AppCompatActivity {
         startActivity(i);
     }
 
+    /** 非正方学校：成绩页说明暂不支持，隐藏同步按钮。 */
+    private void bindSchoolSupport() {
+        com.ecut.campus.data.SchoolProfile school = Schools.current(this);
+        boolean ok = school.supportsGrades();
+        View syncBtn = findViewById(R.id.btn_sync_grades);
+        if (syncBtn != null) syncBtn.setVisibility(ok ? View.VISIBLE : View.GONE);
+        View emptySyncBtn = findViewById(R.id.btn_empty_sync_grades);
+        if (emptySyncBtn != null) emptySyncBtn.setVisibility(ok ? View.VISIBLE : View.GONE);
+        TextView title = findViewById(R.id.tv_empty_grades_title);
+        TextView sub = findViewById(R.id.tv_empty_grades_sub);
+        if (!ok) {
+            if (title != null) title.setText("这个学校暂不支持成绩");
+            if (sub != null) sub.setText("目前只支持正方和强智教务的成绩查询，课表不受影响。");
+        } else if (!school.isEcut() && sub != null) {
+            sub.setText("在设置页登录教务系统一次，之后点「↻ 同步」即可后台更新。");
+        }
+    }
+
     private void syncGrades() {
         if (activeSync != null && activeSync.isRunning()) {
             Toast.makeText(this, "正在同步，请稍候", Toast.LENGTH_SHORT).show();
             return;
         }
+        if (!Schools.current(this).supportsGrades()) {
+            Toast.makeText(this, "这个学校暂不支持成绩", Toast.LENGTH_LONG).show();
+            return;
+        }
         if (!Prefs.hasPortalSession(this)) {
             new androidx.appcompat.app.AlertDialog.Builder(this)
-                    .setTitle("请先登录统一门户")
+                    .setTitle("请先登录" + Schools.loginLabel(this))
                     .setMessage("登录一次后，课表与成绩都能在后台静默更新，不再跳转网页。")
                     .setNegativeButton("取消", null)
                     .setPositiveButton("去登录", (d, w) -> openWeb("portal"))

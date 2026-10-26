@@ -36,6 +36,7 @@ public final class DiagLog {
     private static final String DIR = "diag";
     private static final String LOG = "log.txt";
     private static final String KB = "kblist.json";
+    private static final String PAGE_SAMPLE = "page_sample.json";
     private static final long MAX_BYTES = 256 * 1024;
 
     private DiagLog() {}
@@ -81,7 +82,8 @@ public final class DiagLog {
     /** 去掉 URL 查询参数（可能带 ticket/token）和像学号的长数字。 */
     static String scrub(String s) {
         if (s == null) return "";
-        return s.replaceAll("\\?[^\\s\"']*", "?…")
+        return s.replaceAll("(?i);jsessionid=[^\\s\"'?#/]*", ";…")
+                .replaceAll("\\?[^\\s\"']*", "?…")
                 .replaceAll("(?<![0-9])[0-9]{9,}(?![0-9])", "#########");
     }
 
@@ -106,6 +108,16 @@ public final class DiagLog {
             }
         } catch (Throwable e) {
             log(ctx, "diag", "saveKbList failed: " + e);
+        }
+    }
+
+    /** 保存「导入此页课表」失败时的页面结构样本（调用方已用 PageSample 脱敏）。 */
+    public static void savePageSample(Context ctx, String json) {
+        if (ctx == null || json == null) return;
+        try (FileOutputStream fos = new FileOutputStream(new File(dir(ctx), PAGE_SAMPLE))) {
+            fos.write(json.getBytes(StandardCharsets.UTF_8));
+        } catch (Throwable e) {
+            log(ctx, "diag", "savePageSample failed: " + e);
         }
     }
 
@@ -205,6 +217,17 @@ public final class DiagLog {
             }
         });
 
+        section(sb, "学校", x -> {
+            com.ecut.campus.data.SchoolProfile p = Schools.current(ctx);
+            x.append("学校: ").append(p.name).append(" · id=").append(p.id)
+                    .append(" · 教务: ").append(p.vendor.label).append('(').append(p.vendor.key()).append(')')
+                    .append(" · 访问: ").append(p.access.key()).append('\n');
+            x.append("教务主机: ").append(p.jwHost().isEmpty() ? "-" : p.jwHost())
+                    .append(" · 已验证: ").append(yn(p.verified))
+                    .append(" · 后台同步: ").append(yn(p.supportsBackgroundSync()))
+                    .append(" · 成绩: ").append(yn(p.supportsGrades())).append('\n');
+        });
+
         section(sb, "登录与同步", x -> {
             x.append("门户会话: ").append(yn(Prefs.hasPortalSession(ctx)))
                     .append(" · 登录过期: ").append(yn(Prefs.sessionExpired(ctx))).append('\n');
@@ -228,7 +251,7 @@ public final class DiagLog {
 
         section(sb, "周次", x -> {
             String rawStart = Prefs.semesterStartDate(ctx);
-            String eff = WeekMath.effectiveStart(rawStart, semId);
+            String eff = WeekMath.effectiveStart(rawStart, semId, Schools.current(ctx).isEcut());
             x.append("今天: ").append(WeekMath.todayDateLabel()).append('\n');
             x.append("设置的开学日期: ").append(rawStart.isEmpty() ? "(未设置)" : rawStart).append('\n');
             x.append("实际使用的第1周周一: ").append(eff.isEmpty() ? "(无)" : eff).append('\n');
@@ -246,7 +269,7 @@ public final class DiagLog {
                     .append(" · 跳过版本 ").append(Prefs.updateSkippedTag(ctx).isEmpty() ? "(无)" : Prefs.updateSkippedTag(ctx)).append('\n');
             ScheduleSettings ss = ScheduleSettingsStore.load(ctx);
             StringBuilder r = new StringBuilder();
-            for (int i = 1; i <= ScheduleSettings.SECTION_COUNT; i++) {
+            for (int i = 1; i <= ss.sectionCount(); i++) {
                 if (r.length() > 0) r.append("  ");
                 r.append(i).append(':').append(ss.startTime(i));
             }
@@ -326,6 +349,11 @@ public final class DiagLog {
 
         sb.append("== 最近一次教务原始课表（已去除学生信息）==\n");
         sb.append(readText(new File(dir(ctx), KB), "(还没有同步过)")).append("\n\n");
+        File sample = new File(dir(ctx), PAGE_SAMPLE);
+        if (sample.exists()) {
+            sb.append("== 页面结构样本（只含标签和字段名）==\n");
+            sb.append(readText(sample, "(空)")).append("\n\n");
+        }
         sb.append("== 运行日志（同步过程、指令、崩溃）==\n");
         sb.append(readText(new File(dir(ctx), LOG), "(空)")).append('\n');
         return sb.toString();
