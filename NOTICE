@@ -18,3 +18,35 @@ in the shiguang_warehouse adapter repository (MIT License); it is an
 independent implementation and contains no copied code.
 
 部分控件的视觉灵感来自 Uiverse.io 社区组件库 galaxy（https://github.com/uiverse-io/galaxy，MIT 许可），已按原生 Android 重新实现，未直接使用其代码。
+
+学校目录（app/src/main/assets/school-directory.json）的数据来自 baoozak/timetable
+的 utils/schools.json（https://github.com/baoozak/timetable），按 MIT 许可使用，
+烫梨只做了去重和格式转换：
+
+MIT License
+
+Copyright (c) 2026 baoozak
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+--------------------------------------------------------------------------------
+南京大学课表入口与课表文字格式（本科「我的课表」列表视图、研究生 wdkbapp 接口）参考
+WheretoSleepinNJU/NJU-Class-Shedule-Flutter（南哪课表），Apache License 2.0。
+https://github.com/WheretoSleepinNJU/NJU-Class-Shedule-Flutter
+烫梨中的实现（WiseduSource）为 Java 重写，已修改。

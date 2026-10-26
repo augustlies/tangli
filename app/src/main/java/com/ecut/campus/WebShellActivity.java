@@ -528,7 +528,7 @@ public class WebShellActivity extends AppCompatActivity {
             String url = webView.getUrl();
             TimetableSource src = TimetableSources.detect(url, html);
             if (src == null && school.allowsUrl(url)) src = Schools.source(school);
-            DiagLog.log(this, "import", "导入此页: 识别=" + (src == null ? "无" : src.vendor().key())
+            DiagLog.log(this, "import", "导入此页: 识别=" + (src == null ? "无" : src.label())
                     + " · " + school.diagSummary() + " · path=" + pathOnly(url));
             if (src == null) {
                 importing = false;
@@ -540,7 +540,7 @@ public class WebShellActivity extends AppCompatActivity {
     }
 
     private void runImport(TimetableSource src, String pageUrl) {
-        Toast.makeText(this, "正在读取" + src.vendor().label + "教务的课表…", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "正在读取" + src.label() + "教务的课表…", Toast.LENGTH_SHORT).show();
         webView.evaluateJavascript(src.extractionJs(school, null, null), raw -> {
             importing = false;
             if (webView == null || isFinishing()) return;
@@ -555,8 +555,7 @@ public class WebShellActivity extends AppCompatActivity {
                     + " 周次失败=" + res.failedWeekExpr
                     + (res.warnings.isEmpty() ? "" : " " + res.warnings));
             if (!res.ok()) {
-                showUnsupported("认出这是" + src.vendor().label + "教务，但这一页没有读到课表。\n\n"
-                        + "请先在教务里打开「我的课表」（学期课表）页面，再点「导入此页课表」。");
+                showUnsupported("认出这是" + src.label() + "教务，但没有读到课表。\n\n" + src.emptyHint(res));
                 return;
             }
             probeTermStart(src, res, () -> showImportPreview(src, res, pageUrl));

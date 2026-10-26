@@ -318,12 +318,69 @@
 
                     <TextView
                         style="@style/G.RowSub"
-                        android:text="外观 · 数据 · 关于" />
+                        android:text="外观 · 通知 · 数据" />
                 </LinearLayout>
 
                 <TextView
                     style="@style/G.RowChevron" />
             </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            style="@style/G.SectionLabel"
+            android:text="ABOUT · 关于" />
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/card_about"
+            style="@style/G.Card"
+            android:clickable="true"
+            android:focusable="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="18dp">
+
+                <TextView
+                    android:id="@+id/tv_about_version"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:textColor="?attr/gInk"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    tools:text="烫梨 · v0.4" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="非官方校园工具。教务数据以学校系统为准，成绩计算仅供参考。不保存任何账号密码。"
+                    android:textColor="?attr/gMute"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tv_about_star"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:paddingVertical="4dp"
+                    android:text="★ 觉得好用？去 GitHub 点个 Star，让更多同学找到它"
+                    android:textColor="?attr/gInk"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tv_about_more"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:fontFamily="monospace"
+                    android:text="项目主页 · 检查更新 · 问题反馈  ›"
+                    android:textColor="?attr/gInk"
+                    android:textSize="12sp" />
+
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -781,62 +838,6 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <TextView
-            style="@style/G.SectionLabel"
-            android:text="ABOUT · 关于" />
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/card_about"
-            style="@style/G.Card"
-            android:clickable="true"
-            android:focusable="true">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="18dp">
-
-                <TextView
-                    android:id="@+id/tv_about_version"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:fontFamily="monospace"
-                    android:textColor="?attr/gInk"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    tools:text="烫梨 · v0.4" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="非官方校园工具。教务数据以学校系统为准，成绩计算仅供参考。不保存任何账号密码。"
-                    android:textColor="?attr/gMute"
-                    android:textSize="12sp" />
-
-                <TextView
-                    android:id="@+id/tv_about_star"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:background="?attr/selectableItemBackground"
-                    android:paddingVertical="4dp"
-                    android:text="★ 觉得好用？去 GitHub 点个 Star，让更多同学找到它"
-                    android:textColor="?attr/gInk"
-                    android:textSize="12sp" />
-
-                <TextView
-                    android:id="@+id/tv_about_more"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:fontFamily="monospace"
-                    android:text="项目主页 · 检查更新 · 问题反馈  ›"
-                    android:textColor="?attr/gInk"
-                    android:textSize="12sp" />
-
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
 
     </LinearLayout>
 
