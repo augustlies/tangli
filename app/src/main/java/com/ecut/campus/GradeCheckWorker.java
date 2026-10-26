@@ -47,7 +47,7 @@ public class GradeCheckWorker extends Worker {
     public Result doWork() {
         Context ctx = getApplicationContext();
         if (!Prefs.gradeNotify(ctx) || !Prefs.hasPortalSession(ctx) || Prefs.sessionExpired(ctx)
-                || Prefs.isGradesDemo(ctx)) {
+                || Prefs.isGradesDemo(ctx) || !Schools.current(ctx).supportsGrades()) {
             return Result.success();
         }
         CountDownLatch done = new CountDownLatch(1);
