@@ -208,18 +208,6 @@
                     android:textColor="?attr/gCard"
                     android:textSize="13sp" />
 
-                <TextView
-                    android:id="@+id/btn_load_demo_grades"
-                    android:visibility="gone"
-                    android:layout_width="wrap_content"
-                    android:layout_height="38dp"
-                    android:layout_marginStart="10dp"
-                    android:background="@drawable/bg_gauge_outline"
-                    android:gravity="center"
-                    android:paddingHorizontal="16dp"
-                    android:text="载入样本体验"
-                    android:textColor="?attr/gInk"
-                    android:textSize="13sp" />
             </LinearLayout>
         </LinearLayout>
 

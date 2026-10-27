@@ -649,14 +649,28 @@ public class WebShellActivity extends AppCompatActivity {
     private void showUnsupported(String detail) {
         if (isFinishing()) return;
         String msg = (detail != null ? detail + "\n\n" : "烫梨还读不了这个页面的课表。\n\n")
-                + "可以导出一份「页面结构样本」帮忙适配你的学校：只记网页用了哪些标签和字段名，"
+                + "可以「交给 AI 读」：在课表那一页点它，烫梨把页面文字（去掉姓名学号）连同说明一起复制，"
+                + "发给任意 AI 换成烫梨指令再导回来。\n\n"
+                + "也可以导出一份「页面结构样本」帮忙适配你的学校：只记网页用了哪些标签和字段名，"
                 + "不含姓名、学号等文字，会附在诊断日志里一起分享。";
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle(detail != null ? "没读到课表" : "暂不支持这个教务系统")
                 .setMessage(msg)
                 .setNegativeButton("关闭", null)
-                .setPositiveButton("导出结构样本", (d, w) -> exportPageSample())
+                .setNeutralButton("导出结构样本", (d, w) -> exportPageSample())
+                .setPositiveButton("交给 AI 读", (d, w) -> copyPageForAi())
                 .show();
+    }
+
+    /** 读不了的页面：取页面文字交给 AI 转成烫梨指令（零适配兜底）。 */
+    private void copyPageForAi() {
+        if (webView == null) return;
+        webView.evaluateJavascript(com.ecut.campus.data.PageTextForAi.collectJs(), raw -> {
+            if (isFinishing()) return;
+            String text = unwrapJsString(raw);
+            DiagLog.log(this, "import", "交给 AI 读: 页面文字 " + text.length() + " 字 · " + school.diagSummary());
+            CommandUi.copyPageForAi(this, text);
+        });
     }
 
     private void exportPageSample() {

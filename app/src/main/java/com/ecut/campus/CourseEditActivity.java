@@ -101,6 +101,8 @@ public class CourseEditActivity extends AppCompatActivity {
         bindViews();
         prepareDraft(sessionIndex);
         renderAll();
+        com.ecut.campus.fun.CourseExtras.attach(this, findViewById(R.id.course_extras),
+                timetable, editingCourse, sessionIndex);
 
         findViewById(R.id.btn_course_back).setOnClickListener(v -> confirmExit());
         findViewById(R.id.btn_course_save).setOnClickListener(v -> save());
@@ -698,6 +700,7 @@ public class CourseEditActivity extends AppCompatActivity {
             target.source = Timetable.SOURCE_CUSTOM;
             timetable.courses.add(target);
         }
+        String oldName = editingCourse == null ? null : editingCourse.name;
         target.name = name;
         target.teacher = etTeacher.getText().toString().trim();
         target.note = etNote.getText().toString().trim();
@@ -707,6 +710,7 @@ public class CourseEditActivity extends AppCompatActivity {
         for (Timetable.Session s : draftSessions) target.sessions.add(copySession(s));
 
         if (TimetableStore.save(this, timetable)) {
+            if (oldName != null) com.ecut.campus.fun.FunPrefs.renameAbsence(this, timetable, oldName, name);
             dirty = false;
             Toast.makeText(this, "已保存课程：" + name, Toast.LENGTH_SHORT).show();
             setResult(RESULT_OK);

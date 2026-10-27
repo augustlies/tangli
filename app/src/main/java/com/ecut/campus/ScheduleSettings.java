@@ -172,6 +172,49 @@ public final class ScheduleSettings {
         return o;
     }
 
+    /** 分享码里用的紧凑作息：f=第 1 节开始，n=每天几节，d=每节时长，b=课后休息（只写前 n 节）。 */
+    public JSONObject toShare() throws JSONException {
+        normalizeSections();
+        JSONObject o = new JSONObject();
+        o.put("f", firstClassStart);
+        int n = sectionCount();
+        o.put("n", n);
+        JSONArray d = new JSONArray(), b = new JSONArray();
+        for (int i = 1; i <= n; i++) {
+            d.put(section(i).durationMinutes);
+            b.put(section(i).breakAfterMinutes);
+        }
+        o.put("d", d);
+        o.put("b", b);
+        return o;
+    }
+
+    /** 解析分享码里的作息；格式不对返回 null。没写到的节次沿用默认值。 */
+    public static ScheduleSettings fromShare(JSONObject o) {
+        if (o == null || parseHm(o.optString("f", "")) < 0) return null;
+        JSONArray d = o.optJSONArray("d"), b = o.optJSONArray("b");
+        if (d == null || b == null || d.length() == 0) return null;
+        ScheduleSettings s = createDefault();
+        s.firstClassStart = o.optString("f");
+        s.sectionCount = clamp(o.optInt("n", d.length()), MIN_SECTIONS, MAX_SECTIONS);
+        for (int i = 0; i < Math.min(MAX_SECTIONS, d.length()); i++) {
+            Section x = s.sections.get(i);
+            x.durationMinutes = clamp(d.optInt(i, x.durationMinutes), 1, 300);
+            if (i < b.length()) x.breakAfterMinutes = clamp(b.optInt(i, x.breakAfterMinutes), 0, 600);
+        }
+        return s;
+    }
+
+    /** 两份作息在前 max(两者节数) 节上的上下课时间是否完全一样。 */
+    public boolean sameTimesAs(ScheduleSettings o) {
+        if (o == null) return false;
+        int n = Math.max(sectionCount(), o.sectionCount());
+        for (int i = 1; i <= n; i++) {
+            if (startMinutes(i) != o.startMinutes(i) || endMinutes(i) != o.endMinutes(i)) return false;
+        }
+        return true;
+    }
+
     public static ScheduleSettings fromJson(String json) throws JSONException {
         return fromJson(new JSONObject(json));
     }

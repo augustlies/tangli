@@ -204,6 +204,16 @@ public final class Ui {
         return tv.resourceId;
     }
 
+    /** 弹窗里放一个输入框：左右 22dp、上 8dp 留白。height 用 px 或 -2（自适应）。 */
+    public static LinearLayout dialogBox(Activity a, View child, int height) {
+        int p = dp(a, 22);
+        LinearLayout box = new LinearLayout(a);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(p, dp(a, 8), p, 0);
+        box.addView(child, new LinearLayout.LayoutParams(-1, height));
+        return box;
+    }
+
     public static FrameLayout.LayoutParams match() {
         return new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT);

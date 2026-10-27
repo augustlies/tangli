@@ -33,4 +33,29 @@ public class InteractionMathTest {
         assertEquals(500f, ThemeReveal.revealRadius(0f, 0f, 300f, 400f), 1e-3);
         assertEquals(250f, ThemeReveal.revealRadius(150f, 200f, 300f, 400f), 1e-3);
     }
+
+    @Test
+    public void blockPlanKeepsRoomBeforeTeacherAndTag() {
+        float[] title3 = {14f, 28f, 42f};
+        // 地方够：全都放
+        int[] p = TimetableView.blockPlan(200f, title3, 3f, 12f, 0f, 12f, 12f);
+        assertEquals(3, p[0]);
+        assertEquals(1 | 4 | 8, p[1]);
+        // 两节课高度但字体大：课名 3 行 + 教室 + 教师，标签挤掉，绝不裁切
+        p = TimetableView.blockPlan(73f, title3, 3f, 12f, 0f, 12f, 12f);
+        assertEquals(3, p[0]);
+        assertEquals(1 | 4, p[1]);
+        // 很矮：课名压到 2 行也要留教室
+        p = TimetableView.blockPlan(44f, title3, 3f, 12f, 0f, 12f, 12f);
+        assertEquals(2, p[0]);
+        assertEquals(1, p[1]);
+        // 连 1 行课名 + 教室都放不下：只剩课名
+        p = TimetableView.blockPlan(20f, title3, 3f, 12f, 0f, 12f, 12f);
+        assertEquals(1, p[0]);
+        assertEquals(0, p[1]);
+        // 没有教室：教师、标签按顺序
+        p = TimetableView.blockPlan(60f, title3, 3f, 0f, 0f, 12f, 12f);
+        assertEquals(3, p[0]);
+        assertEquals(4, p[1]);
+    }
 }

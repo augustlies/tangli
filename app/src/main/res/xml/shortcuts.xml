@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 长按 App 图标弹出的快捷方式：添加「今日课程」（可以拉成 2×2 方块）。targetPackage 是正式包名（debug 包带 .debug 后缀，这条在 debug 包里点不开）。 -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_widget"
+        android:shortcutId="pin_class_widget"
+        android:shortcutLongLabel="@string/shortcut_pin_widget"
+        android:shortcutShortLabel="@string/shortcut_pin_widget">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="com.ecut.campus.PinWidgetActivity"
+            android:targetPackage="com.ecut.campus" />
+    </shortcut>
+</shortcuts>

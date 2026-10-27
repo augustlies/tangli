@@ -58,6 +58,14 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
+            <!-- 这节课值多少钱 + 缺勤安全气囊（fun/CourseExtras，只对已有课程显示） -->
+            <LinearLayout
+                android:id="@+id/course_extras"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone" />
+
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

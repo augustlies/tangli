@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 长按图标「添加今日课程组件」的图标前景：纸色小卡片 + 两条课程色条 + 右下角朱红加号（108dp 自适应图标画布，内容在中间 66dp 安全区）。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 卡片 -->
+    <path
+        android:fillColor="#FBFAF7"
+        android:strokeColor="#1C1C1A"
+        android:strokeWidth="2.5"
+        android:pathData="M37,36h34a6,6 0,0 1,6 6v24a6,6 0,0 1,-6 6h-34a6,6 0,0 1,-6 -6v-24a6,6 0,0 1,6 -6z" />
+    <!-- 标题 -->
+    <path
+        android:fillColor="#1C1C1A"
+        android:pathData="M37.5,42h18a1.5,1.5 0,0 1,0 3h-18a1.5,1.5 0,0 1,0 -3z" />
+    <!-- 课程条 -->
+    <path
+        android:fillColor="#F4C7B5"
+        android:pathData="M38.5,49h31a2.5,2.5 0,0 1,2.5 2.5v2a2.5,2.5 0,0 1,-2.5 2.5h-31a2.5,2.5 0,0 1,-2.5 -2.5v-2a2.5,2.5 0,0 1,2.5 -2.5z" />
+    <path
+        android:fillColor="#D9E3CF"
+        android:pathData="M38.5,59h22a2.5,2.5 0,0 1,2.5 2.5v2a2.5,2.5 0,0 1,-2.5 2.5h-22a2.5,2.5 0,0 1,-2.5 -2.5v-2a2.5,2.5 0,0 1,2.5 -2.5z" />
+    <!-- 加号 -->
+    <path
+        android:fillColor="#FF4A1C"
+        android:strokeColor="#ECEAE4"
+        android:strokeWidth="2"
+        android:pathData="M76,63a9,9 0,1 1,0 18a9,9 0,1 1,0 -18z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M75,67.5h2v4.5h4.5v2h-4.5v4.5h-2v-4.5h-4.5v-2h4.5z" />
+</vector>

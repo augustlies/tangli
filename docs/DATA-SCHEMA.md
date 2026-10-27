@@ -333,3 +333,26 @@ interface TimetableSource {
 - `TimetableSources.detect`：所有来源打分取最高，低于 40 视为认不出。
 - 认不出时可导出页面结构样本（`PageSample`，只含标签/id/class/字段名，去中文、长数字、邮箱、查询参数），存 `diag/page_sample.json` 并附在诊断日志里。
 - 成绩只支持正方（`SchoolProfile.supportsGrades()`）。
+
+
+---
+
+## 5. 小玩意本地设置 `SharedPreferences("fun")`（v1.2.6 起）
+
+只存在本机，不参与同步、导出和分享码；`fun/FunPrefs` 读写，逻辑在 `data/`（纯 Java）。
+
+| key | 类型 | 说明 |
+|---|---|---|
+| `grade_verdict` | boolean，缺省 `true` | 翻牌批语开关（`data/GradeVerdict`） |
+| `tuition` | string，缺省空 | 用户填的每学期学费原文，`ClassPrice.parseTuition` 解析；空 = 不显示单价 |
+| `absence_<学期 id>` | string（JSON） | 缺勤记录，按学期分开（`data/AbsenceBook`） |
+
+缺勤记录 JSON：
+
+```json
+{ "高等数学a": { "l": 1, "a": 0, "c": 2 } }
+```
+
+- key 为规范化课名（`CourseColorAssigner.normalizeName`，与配色合并同一规则），所以重新同步、课程 key 变化不丢；课名改了就对不上
+- `l` 请假、`a` 缺勤、`c` 被点名，都 ≥ 0；三项全 0 的条目不写
+- 上限 = 本学期该课（同名所有时段）在 1..总周数 内的总课次 ÷ 3 向下取整；`l + a` 计入，`c` 只计数；`l + a` ≥ 上限的 80% 时课表描红边

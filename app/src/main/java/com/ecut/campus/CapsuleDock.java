@@ -215,24 +215,24 @@ public class CapsuleDock extends View {
 
         int pillColor, onPill, offColor;
         if (G.GLASS) {
-            bgPaint.setColor(G.NIGHT ? 0x8C1C1C20 : 0x99FFFFFF);
+            // 底栏压在课表上：要够实，后面的课名不能透出来抢字
+            bgPaint.setColor(G.NIGHT ? 0xD91C1C20 : 0xD9FFFFFF);
             strokePaint.setColor(G.NIGHT ? 0x2EFFFFFF : 0xE6FFFFFF);
-            pillColor = G.INK;
-            onPill = G.ON_INK;
+            pillColor = G.alpha(G.INK, 0x14);
             offColor = G.SUB;
         } else {
-            bgPaint.setColor(G.INK);
-            pillColor = G.ON_INK;
-            onPill = G.INK;
-            offColor = G.alpha(G.ON_INK, 0x99);
+            // 纸色胶囊 + 发丝描边，选中块是一层淡墨（不再用整条黑底）
+            bgPaint.setColor(G.alpha(G.CARD, 0xF2));
+            strokePaint.setColor(G.alpha(G.INK, 0x1C));
+            pillColor = G.alpha(G.INK, G.NIGHT ? 0x1A : 0x0F);
+            offColor = G.mix(G.SUB, G.MUTE, 0.4f);  // 比 MUTE 深一点，浅底上约 4.9:1
         }
+        onPill = G.INK;
         tmp.set(0, 0, w, h);
         canvas.drawRoundRect(tmp, r, r, bgPaint);
-        if (G.GLASS) {
-            float d = strokePaint.getStrokeWidth() / 2f;
-            tmp.set(d, d, w - d, h - d);
-            canvas.drawRoundRect(tmp, r, r, strokePaint);
-        }
+        float hs = strokePaint.getStrokeWidth() / 2f;
+        tmp.set(hs, hs, w - hs, h - hs);
+        canvas.drawRoundRect(tmp, r, r, strokePaint);
 
         float cell = cellWidth();
         float p = pad();
@@ -248,7 +248,7 @@ public class CapsuleDock extends View {
             // 按着别的格：先在那里浮出一颗淡胶囊，告诉你松手会去哪
             float pcx = p + cell * (pressedSlot + 0.5f);
             tmp.set(pcx - cell / 2f, p, pcx + cell / 2f, h - p);
-            pillPaint.setColor(G.alpha(pillColor, 0x40));
+            pillPaint.setColor(G.alpha(G.INK, 0x0A));
             canvas.drawRoundRect(tmp, pr, pr, pillPaint);
         }
 

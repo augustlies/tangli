@@ -209,6 +209,13 @@ public final class Prefs {
     public static boolean gradeNotify(Context ctx) { return sp(ctx).getBoolean("grade_notify", true); }
     public static void setGradeNotify(Context ctx, boolean v) { sp(ctx).edit().putBoolean("grade_notify", v).apply(); }
 
+    /** 课前提醒，默认关。 */
+    public static boolean classRemind(Context ctx) { return sp(ctx).getBoolean("class_remind", false); }
+    public static void setClassRemind(Context ctx, boolean v) { sp(ctx).edit().putBoolean("class_remind", v).apply(); }
+    /** 提前几分钟提醒（5/10/15/20），默认 10。 */
+    public static int classRemindLead(Context ctx) { return sp(ctx).getInt("class_remind_lead", 10); }
+    public static void setClassRemindLead(Context ctx, int m) { sp(ctx).edit().putInt("class_remind_lead", m).apply(); }
+
     public static String calendarImageUrl(Context ctx) { return sp(ctx).getString("calendar_img", ""); }
     public static void setCalendarImageUrl(Context ctx, String u) { sp(ctx).edit().putString("calendar_img", u).apply(); }
 
@@ -221,9 +228,22 @@ public final class Prefs {
         String id = sp(ctx).getString("school_id", "");
         return id == null || id.isEmpty() ? com.ecut.campus.data.SchoolProfile.ECUT_ID : id;
     }
+    /** 用户是否亲手选过学校（schoolId 没选过时会回落到东华理工，这里不算）。 */
+    public static boolean hasChosenSchool(Context ctx) {
+        String id = sp(ctx).getString("school_id", "");
+        return id != null && !id.isEmpty();
+    }
     public static void setSchoolId(Context ctx, String id) { sp(ctx).edit().putString("school_id", id).apply(); }
 
     /** 自定义学校（SchoolProfile JSON）。 */
     public static String customSchoolJson(Context ctx) { return sp(ctx).getString("custom_school", ""); }
     public static void setCustomSchoolJson(Context ctx, String json) { sp(ctx).edit().putString("custom_school", json).apply(); }
+
+    /** 小组件背景：false = 默认纸色，true = 自选图片（files/widget_bg.jpg）。版本号每换一次图 / 改一次遮罩就变，用来刷新缓存。 */
+    public static boolean widgetBgImage(Context ctx) { return sp(ctx).getBoolean("widget_bg_image", false); }
+    public static void setWidgetBgImage(Context ctx, boolean on) { sp(ctx).edit().putBoolean("widget_bg_image", on).putLong("widget_bg_ver", System.currentTimeMillis()).commit(); }
+    public static long widgetBgVer(Context ctx) { return sp(ctx).getLong("widget_bg_ver", 0L); }
+    /** 遮罩强度 %，默认 35（见 data/WidgetLook）。 */
+    public static int widgetMask(Context ctx) { return com.ecut.campus.data.WidgetLook.clampMask(sp(ctx).getInt("widget_mask", com.ecut.campus.data.WidgetLook.MASK_DEFAULT)); }
+    public static void setWidgetMask(Context ctx, int p) { sp(ctx).edit().putInt("widget_mask", com.ecut.campus.data.WidgetLook.clampMask(p)).putLong("widget_bg_ver", System.currentTimeMillis()).commit(); }
 }

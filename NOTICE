@@ -50,3 +50,6 @@ SOFTWARE.
 WheretoSleepinNJU/NJU-Class-Shedule-Flutter（南哪课表），Apache License 2.0。
 https://github.com/WheretoSleepinNJU/NJU-Class-Shedule-Flutter
 烫梨中的实现（WiseduSource）为 Java 重写，已修改。
+
+二维码生成与扫码使用 ZXing（https://github.com/zxing/zxing，Apache License 2.0）
+和 zxing-android-embedded（https://github.com/journeyapps/zxing-android-embedded，Apache License 2.0）。

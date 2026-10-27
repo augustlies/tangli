@@ -2,8 +2,6 @@ package com.ecut.campus;
 
 import android.app.Activity;
 import android.content.Context;
-import android.content.Intent;
-import android.net.Uri;
 import android.os.Build;
 import android.widget.Toast;
 
@@ -380,22 +378,13 @@ public final class DiagLog {
     /** 写成 txt 并弹出系统分享（微信 / QQ / 邮件都行）。 */
     public static void export(Activity a) {
         try {
-            File d = new File(a.getExternalFilesDir(null), "export");
-            if (!d.exists()) d.mkdirs();
             String name = "tangli-diag-" + new SimpleDateFormat("MMdd-HHmm", Locale.US)
                     .format(new Date()) + ".txt";
-            File out = new File(d, name);
+            File out = ShareFiles.exportFile(a, name);
             try (FileOutputStream fos = new FileOutputStream(out)) {
                 fos.write(buildReport(a).getBytes(StandardCharsets.UTF_8));
             }
-            Uri uri = androidx.core.content.FileProvider.getUriForFile(
-                    a, a.getPackageName() + ".fileprovider", out);
-            Intent share = new Intent(Intent.ACTION_SEND);
-            share.setType("text/plain");
-            share.putExtra(Intent.EXTRA_STREAM, uri);
-            share.putExtra(Intent.EXTRA_SUBJECT, "烫梨诊断日志 v" + BuildConfig.VERSION_NAME);
-            share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            a.startActivity(Intent.createChooser(share, "发送诊断日志"));
+            ShareFiles.send(a, out, "text/plain", "烫梨诊断日志 v" + BuildConfig.VERSION_NAME, "发送诊断日志");
         } catch (Throwable e) {
             Toast.makeText(a, "导出失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
         }

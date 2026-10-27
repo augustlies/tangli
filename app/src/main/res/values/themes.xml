@@ -155,14 +155,14 @@
         <item name="materialAlertDialogTheme">@style/Glass.Dialog</item>
         <item name="android:alertDialogTheme">@style/Glass.Dialog.Framework</item>
     </style>
-    <!-- 玻璃弹窗：半透明磨砂片 + 大圆角；Android 12+ 另见 values-v31 的背景模糊 -->
+    <!-- 玻璃弹窗：近乎不透明的磨砂片 + 发丝边 + 大圆角；Android 12+ 另加背景模糊（只是加分项） -->
     <style name="Glass.Dialog" parent="Gauge.Dialog">
         <item name="android:windowBackground">@drawable/bg_glass_dialog</item>
-        <item name="android:backgroundDimAmount">0.16</item>
+        <item name="android:backgroundDimAmount">0.25</item>
     </style>
     <style name="Glass.Dialog.Framework" parent="Gauge.Dialog.Framework">
         <item name="android:windowBackground">@drawable/bg_glass_dialog</item>
-        <item name="android:backgroundDimAmount">0.16</item>
+        <item name="android:backgroundDimAmount">0.25</item>
     </style>
     <style name="Glass.Shape.Small" parent="">
         <item name="cornerFamily">rounded</item>
@@ -176,5 +176,13 @@
         <item name="backgroundTint">@color/glass_ink</item>
         <item name="android:textColor">@color/glass_on_ink</item>
         <item name="cornerRadius">22dp</item>
+    </style>
+    <!-- 添加桌面组件的小卡片：半透明页面，遮罩和卡片在布局里画 -->
+    <style name="Theme.Tangli.PinCard" parent="Theme.EcutCampus">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation.Dialog</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
 </resources>

@@ -17,6 +17,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.ecut.campus.data.Grades;
 import com.ecut.campus.data.GradesStore;
+import com.ecut.campus.fun.GradeFlip;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,20 +43,13 @@ public class GradesActivity extends AppCompatActivity {
         View emptySyncBtn = findViewById(R.id.btn_empty_sync_grades);
         if (emptySyncBtn != null) emptySyncBtn.setOnClickListener(v -> syncGrades());
 
-        View demoBtn = findViewById(R.id.btn_load_demo_grades);
-        if (demoBtn != null) {
-            demoBtn.setOnClickListener(v -> {
-                DemoData.seedGradesOnly(this);
-                refresh();
-                Toast.makeText(this, "已载入演示成绩（已标记）", Toast.LENGTH_SHORT).show();
-            });
-        }
-
         refresh();
     }
 
     /** 本次打开时已经翻开的新成绩。 */
     private final java.util.Set<String> revealed = new java.util.HashSet<>();
+    /** 已经翻出批语、还没看分数的新成绩 → 那句批语。 */
+    private final java.util.Map<String, String> verdicts = new java.util.HashMap<>();
 
     private void coverScore(TextView tv) {
         tv.setText("翻开");
@@ -245,8 +239,18 @@ public class GradesActivity extends AppCompatActivity {
                 coverScore(tvScore);
                 lp.width = 0;
                 bar.setLayoutParams(lp);
+                if (verdicts.containsKey(cid)) GradeFlip.applyVerdict(tvMeta, tvScore, verdicts.get(cid));
                 row.setOnClickListener(rv -> {
                     if (revealed.contains(cid)) return;
+                    if (!verdicts.containsKey(cid)) {
+                        // 翻牌批语：先给一句话，再点一下才看分数
+                        String verdict = GradeFlip.verdictFor(this, cg);
+                        if (!verdict.isEmpty()) {
+                            verdicts.put(cid, verdict);
+                            GradeFlip.flipToVerdict(tvMeta, tvScore, verdict);
+                            return;
+                        }
+                    }
                     revealed.add(cid);
                     markSeen(cid);
                     flipReveal((View) tvScore.getParent(), showScore, bar, barW);

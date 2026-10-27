@@ -47,4 +47,5 @@
     <color name="glass_bd_4">#2E2738</color>
     <color name="glass_dialog">#1E1E22</color>
     <color name="glass_dialog_sheet">#F2202024</color>
+    <color name="glass_dialog_stroke">#2BFFFFFF</color>
 </resources>

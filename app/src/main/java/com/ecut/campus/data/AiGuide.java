@@ -55,4 +55,17 @@ public final class AiGuide {
         sb.append("\n我的要求：");
         return sb.toString();
     }
+
+    /**
+     * 「交给 AI 读」：烫梨读不了的教务页面，把页面文字（已去掉姓名学号）接在说明后面，
+     * 让 AI 用「整表」指令把整张课表重建出来。
+     */
+    public static String buildFromPage(Timetable t, TangliCommand.Env env, String sectionTimes, String pageText) {
+        return build(t, env, sectionTimes)
+                + "下面是我学校教务网站课表页面上的文字（烫梨已去掉姓名、学号）。"
+                + "请用「烫梨指令 v1 整表」把里面的所有课程重建出来：课程名、星期、节次、周次、地点、老师都照页面写；"
+                + "页面上能看出每节课的上下课时间就加「作息」行，能看出开学日期就加「开学」行；"
+                + "看不懂的格子宁可跳过，不要猜。\n\n"
+                + "【课表页面】\n" + (pageText == null ? "" : pageText.trim()) + "\n";
+    }
 }

@@ -33,6 +33,9 @@ public final class Updater {
 
     public static final class Release {
         public String tag, name, notes, pageUrl, apkUrl;
+        /** GitHub 资产自带的 SHA-256（"digest": "sha256:…"），没有时为空 */
+        public String sha256 = "";
+        public long size;
     }
 
     public interface Callback {
@@ -68,6 +71,9 @@ public final class Updater {
                                 JSONObject a = assets.getJSONObject(i);
                                 if (a.optString("name").endsWith(".apk")) {
                                     r.apkUrl = a.optString("browser_download_url");
+                                    r.size = a.optLong("size", 0);
+                                    String dg = a.optString("digest", "");
+                                    if (dg.startsWith("sha256:")) r.sha256 = dg.substring(7).toLowerCase(java.util.Locale.US);
                                     break;
                                 }
                             }
@@ -89,6 +95,7 @@ public final class Updater {
 
     /** 打开 App 时静默检查，6 小时最多一次；勾了「不再提示」的版本不再弹。 */
     public static void autoCheck(Activity a) {
+        try { UpdateInstaller.cleanup(a); } catch (Exception ignored) {}
         if (!Prefs.updateAutoCheck(a)) return;
         long now = System.currentTimeMillis();
         if (now - Prefs.updateCheckedAt(a) < AUTO_INTERVAL) return;
@@ -130,8 +137,10 @@ public final class Updater {
         new MaterialAlertDialogBuilder(a)
                 .setTitle("发现新版本 " + r.tag)
                 .setView(sv)
-                .setPositiveButton("下载更新", (d, w) -> open(a, r.apkUrl != null && !r.apkUrl.isEmpty()
-                        ? r.apkUrl : r.pageUrl))
+                .setPositiveButton("更新", (d, w) -> {
+                    if (r.apkUrl != null && !r.apkUrl.isEmpty()) UpdateInstaller.start(a, r);
+                    else open(a, r.pageUrl);
+                })
                 .setNegativeButton("关闭", (d, w) -> {
                     if (allowSkip && never.isChecked()) Prefs.setUpdateSkippedTag(a, r.tag);
                 })

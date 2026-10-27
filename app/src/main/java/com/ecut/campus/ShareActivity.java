@@ -20,14 +20,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.ecut.campus.data.Timetable;
 import com.ecut.campus.data.TimetableShare;
 import com.ecut.campus.data.TimetableStore;
-import com.google.zxing.BarcodeFormat;
-import com.google.zxing.EncodeHintType;
-import com.google.zxing.common.BitMatrix;
-import com.google.zxing.qrcode.QRCodeWriter;
-import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
 
-import java.util.EnumMap;
-import java.util.Map;
 
 /** 三级页：我的课表二维码 + 分享码。 */
 public class ShareActivity extends AppCompatActivity {
@@ -36,7 +29,7 @@ public class ShareActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         G.init(this);
-        LinearLayout col = Ui.page(this, "同学", "分享我的课表", "只包含课程名、地点、时间和周次");
+        LinearLayout col = Ui.page(this, "同学", "分享我的课表", "只包含课程名、地点、时间、周次和作息");
 
         Timetable t = TimetableStore.load(this);
         if (t.courses.isEmpty()) {
@@ -46,7 +39,8 @@ public class ShareActivity extends AppCompatActivity {
         }
         String code;
         try {
-            code = TimetableShare.encode(t, Prefs.shareName(this));
+            code = TimetableShare.encode(t, Prefs.shareName(this),
+                    ScheduleSettingsStore.load(this).toShare()); // 1.2.6：带上作息，同学扫码可一键沿用
         } catch (Exception e) {
             Ui.text(this, col, "生成失败：" + e.getMessage(), 14f, G.ACCENT);
             return;
@@ -63,7 +57,7 @@ public class ShareActivity extends AppCompatActivity {
         qrBox.setPadding(pad, pad, pad, pad);
         ImageView iv = new ImageView(this);
         iv.setAdjustViewBounds(true);
-        Bitmap qr = qr(code, 900);
+        Bitmap qr = QrBitmap.make(code, 900, 0xFF111111, 0xFFFBFAF7);
         if (qr != null) iv.setImageBitmap(qr);
         qrBox.addView(iv, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
@@ -112,21 +106,5 @@ public class ShareActivity extends AppCompatActivity {
         tip.setLineSpacing(0, 1.3f);
         tip.setPadding(0, Ui.dp(this, 16), 0, 0);
         col.addView(tip);
-    }
-
-    private static Bitmap qr(String text, int size) {
-        try {
-            Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
-            hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.L);
-            hints.put(EncodeHintType.MARGIN, 1);
-            BitMatrix m = new QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, size, size, hints);
-            int w = m.getWidth(), h = m.getHeight();
-            int[] px = new int[w * h];
-            for (int y = 0; y < h; y++)
-                for (int x = 0; x < w; x++) px[y * w + x] = m.get(x, y) ? 0xFF111111 : 0xFFFBFAF7;
-            return Bitmap.createBitmap(px, w, h, Bitmap.Config.ARGB_8888);
-        } catch (Exception e) {
-            return null; // 超出二维码容量
-        }
     }
 }

@@ -47,5 +47,7 @@
     <color name="glass_bd_3">#D6CFC0</color>
     <color name="glass_bd_4">#CDC5D4</color>
     <color name="glass_dialog">#F6F5F3</color>
-    <color name="glass_dialog_sheet">#F5F8F7F5</color>
+    <!-- 玻璃弹窗片：约 95% 不透明，背景模糊只是锦上添花（很多手机上不生效），不能靠它挡住后面的字 -->
+    <color name="glass_dialog_sheet">#F2F8F7F5</color>
+    <color name="glass_dialog_stroke">#1F000000</color>
 </resources>

@@ -89,6 +89,14 @@ public class TimetableView extends View {
     private static final int[] LIGHT_BG = PALETTE_BG.clone();
     private static final int[] LIGHT_FG = PALETTE_FG.clone();
 
+    /**
+     * 磨砂玻璃课块的字色：跟纸墨一样取课色本身的深浅，不再一律近黑。
+     * 日间 = 纸墨深色再压 18% 黑（叠在半透明玻璃底上最差约 5.4:1）；夜间 = 玻璃色提亮 35%（最差约 6.1:1）。
+     */
+    static int glassInk(int idx) {
+        return G.NIGHT ? G.mix(PALETTE_GLASS[idx], 0xFFFFFFFF, 0.35f) : G.mix(LIGHT_FG[idx], 0xFF000000, 0.18f);
+    }
+
     /** 深色模式下把暖色课块换成「深底 + 浅字」，色相保持一致。 */
     public static void applyPalette(boolean night) {
         for (int k = 0; k < PALETTE_BG.length; k++) {
@@ -134,6 +142,8 @@ public class TimetableView extends View {
     private final Paint accentPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint badgePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint pageEdgePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final android.graphics.Path clipPath = new android.graphics.Path();
+    private final TextPaint bpSub = new TextPaint(), bpMono = new TextPaint(), bpTagCn = new TextPaint(), bpTagNum = new TextPaint();
     private final TextPaint textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final TextPaint subTextPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
 
@@ -234,6 +244,14 @@ public class TimetableView extends View {
         dragDx = 0;
         pageAnimating = false;
         requestLayout();
+        invalidate();
+    }
+
+    private java.util.Set<String> warnCourses = java.util.Collections.emptySet();
+
+    /** 缺勤快到上限的课（规范化课名），课块左缘描朱砂。 */
+    public void setWarnCourses(java.util.Set<String> keys) {
+        warnCourses = keys == null ? java.util.Collections.emptySet() : keys;
         invalidate();
     }
 
@@ -472,7 +490,6 @@ public class TimetableView extends View {
         canvas.translate(xOffset, 0);
         canvas.clipRect(-xOffset, 0, w - xOffset, h);
 
-        drawTodayColumn(canvas, colWidth, h);
         canvas.save();
         canvas.clipRect(0, headerHeight, w, h);
         drawTimeColumnAndGrid(canvas, w, colWidth);
@@ -488,15 +505,6 @@ public class TimetableView extends View {
             hitBlocks.clear();
             if (savedHits != null) hitBlocks.addAll(savedHits);
         }
-    }
-
-    private void drawTodayColumn(Canvas canvas, float colWidth, int h) {
-        if (!isViewingRealCurrentWeek()) return;
-        if (todayDayOfWeek < 1 || todayDayOfWeek > columnCount()) return;
-        float tx = timeColWidth + (todayDayOfWeek - 1) * colWidth;
-        bgPaint.setStyle(Paint.Style.FILL);
-        bgPaint.setColor(G.GLASS ? G.alpha(0xFFFFFFFF, G.NIGHT ? 0x0A : 0x30) : 0x0AFF4A1C);
-        canvas.drawRect(tx, headerHeight, tx + colWidth, h, bgPaint);
     }
 
     private boolean isViewingRealCurrentWeek() {
@@ -525,14 +533,18 @@ public class TimetableView extends View {
             boolean isToday = highlightToday && d == todayDayOfWeek;
 
             if (isToday && G.GLASS) {
-                badgePaint.setColor(INK);
+                // 今天：浅色半透明胶囊 + 底部一小段砖红，不再用黑胶囊
+                badgePaint.setColor(G.alpha(INK, 0x14));
                 RectF pill = new RectF(cx - colWidth / 2f + dp(3), dp(8), cx + colWidth / 2f - dp(3), headerHeight - dp(5));
                 canvas.drawRoundRect(pill, dp(12), dp(12), badgePaint);
+                badgePaint.setColor(G.alarm());
+                canvas.drawRoundRect(new RectF(cx - dp(7), pill.bottom - dp(4.5f), cx + dp(7), pill.bottom - dp(2.5f)),
+                        dp(1), dp(1), badgePaint);
             } else if (isToday) {
                 badgePaint.setColor(ACCENT);
                 canvas.drawRect(cx - dp(9), headerHeight - dp(2.5f), cx + dp(9), headerHeight, badgePaint);
             }
-            int todayInk = G.GLASS ? G.ON_INK : ACCENT;
+            int todayInk = G.GLASS ? INK : ACCENT;
 
             textPaint.setTypeface(Typeface.DEFAULT_BOLD);
             textPaint.setTextSize(sp(12.5f));
@@ -687,34 +699,50 @@ public class TimetableView extends View {
         if (rect.bottom <= headerHeight || rect.top >= getHeight()) return null;
 
         int textColor = isActive ? fgColor : INK_3;
+        int liveLeft = -1;
         if (isActive) {
             float progress = tag == null ? liveProgress(s) : -1f;
             boolean live = progress >= 0f;
             if (live) {
-                // 正在上的课：墨色实块（纸墨带朱砂错位影），从上往下按已上时长填一层浅色
+                // 正在上的课：保留课色，已上的部分略深（夜间略浅），外加红框 + 左侧红书脊；不再用墨色实块
+                int fill = bgColor;
                 if (G.GLASS) {
-                    blockPaint.setStyle(Paint.Style.FILL);
-                    blockPaint.setColor(G.alpha(0xFF000000, G.NIGHT ? 0x66 : 0x2E));
-                    canvas.drawRoundRect(new RectF(left, top + dp(3), right, bottom + dp(3)), radius, radius, blockPaint);
-                } else {
-                    accentPaint.setStyle(Paint.Style.FILL);
-                    accentPaint.setColor(ACCENT);
-                    canvas.drawRoundRect(new RectF(left + dp(2.5f), top + dp(2.5f), right + dp(2.5f), bottom + dp(2.5f)),
-                            radius, radius, accentPaint);
+                    int glass = PALETTE_GLASS[colorIdx];
+                    fill = G.NIGHT ? G.alpha(G.mix(glass, 0xFF000000, 0.58f), 0xC8) : G.alpha(glass, 0xD6);
+                    textColor = glassInk(colorIdx);
                 }
                 blockPaint.setStyle(Paint.Style.FILL);
-                blockPaint.setColor(INK);
+                blockPaint.setColor(fill);
                 canvas.drawRoundRect(rect, radius, radius, blockPaint);
                 canvas.save();
-                canvas.clipRect(left, top, right, top + (bottom - top) * progress);
-                blockPaint.setColor(G.alpha(G.ON_INK, 0x1F));
-                canvas.drawRoundRect(rect, radius, radius, blockPaint);
+                clipPath.reset();
+                clipPath.addRoundRect(rect, radius, radius, android.graphics.Path.Direction.CW);
+                canvas.clipPath(clipPath);
+                blockPaint.setColor(G.alpha(fgColor, 0x21));  // ≈ mix(底色, 字色, 0.13)：日间更深、夜间更浅
+                float split = top + (bottom - top) * progress;
+                canvas.drawRect(left, top, right, split, blockPaint);
+                // 「现在」在块内只画一条朱砂发丝线（在文字下面），块外的现在线遇到这里会跳过
+                blockPaint.setColor(G.alpha(G.alarm(), 0x99));
+                float hl = Math.max(1f, dp(0.7f));
+                canvas.drawRect(left, split - hl / 2f, right, split + hl / 2f, blockPaint);
+                accentPaint.setStyle(Paint.Style.FILL);
+                accentPaint.setColor(G.alarm());
+                canvas.drawRect(left, top, left + dp(3f), bottom, accentPaint);
                 canvas.restore();
-                // 进度刻度：左缘一条朱砂短线停在「现在」
-                accentPaint.setColor(G.GLASS ? G.ON_INK : ACCENT);
-                float py = top + (bottom - top) * progress;
-                canvas.drawRect(left, py - dp(0.8f), left + dp(6f), py + dp(0.8f), accentPaint);
-                textColor = G.ON_INK;
+                if (G.GLASS) {
+                    blockPaint.setStyle(Paint.Style.STROKE);
+                    blockPaint.setStrokeWidth(Math.max(1f, dp(0.8f)));
+                    blockPaint.setColor(G.alpha(0xFFFFFFFF, G.NIGHT ? 0x26 : 0xCC));
+                    canvas.drawRoundRect(rect, radius, radius, blockPaint);
+                }
+                float sw = dp(2f), in = sw / 2f + (G.GLASS ? dp(0.8f) : 0f);
+                blockPaint.setStyle(Paint.Style.STROKE);
+                blockPaint.setStrokeWidth(sw);
+                blockPaint.setColor(G.alarm());
+                canvas.drawRoundRect(new RectF(left + in, top + in, right - in, bottom - in),
+                        Math.max(0f, radius - in), Math.max(0f, radius - in), blockPaint);
+                blockPaint.setStyle(Paint.Style.FILL);
+                liveLeft = Math.max(1, sessionEndMin(s) - nowMinutes);
             } else if (G.GLASS) {
                 blockPaint.setStyle(Paint.Style.FILL);
                 int glass = PALETTE_GLASS[colorIdx];
@@ -724,7 +752,7 @@ public class TimetableView extends View {
                 blockPaint.setStrokeWidth(Math.max(1f, dp(0.8f)));
                 blockPaint.setColor(G.alpha(0xFFFFFFFF, G.NIGHT ? 0x26 : 0xCC));
                 canvas.drawRoundRect(rect, radius, radius, blockPaint);
-                textColor = G.NIGHT ? fgColor : G.INK;
+                textColor = glassInk(colorIdx);
             } else {
                 blockPaint.setStyle(Paint.Style.FILL);
                 blockPaint.setColor(bgColor);
@@ -744,7 +772,7 @@ public class TimetableView extends View {
                 // 冲突角标：朱砂小方块 + 数量
                 float bs = dp(11);
                 RectF badge = new RectF(right - bs - dp(2), top + dp(2), right - dp(2), top + dp(2) + bs);
-                badgePaint.setColor(ACCENT);
+                badgePaint.setColor(G.alarm());
                 canvas.drawRoundRect(badge, dp(2), dp(2), badgePaint);
                 subTextPaint.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.BOLD));
                 subTextPaint.setTextSize(sp(7.5f));
@@ -762,7 +790,7 @@ public class TimetableView extends View {
             blockPaint.setPathEffect(null);
         }
 
-        drawBlockText(canvas, rect, course, s, isActive, textColor, tag);
+        drawBlockText(canvas, rect, course, s, isActive, textColor, tag, liveLeft);
         HitBlock hb = new HitBlock(rect, course, s, isActive);
         hitBlocks.add(hb);
         return hb;
@@ -847,10 +875,14 @@ public class TimetableView extends View {
         }
         if (y < 0 || y <= headerHeight) return;
         float x0 = timeColWidth + (todayDayOfWeek - 1) * colWidth;
+        for (HitBlock hb : hitBlocks) {
+            // 正在上的课块里已有那条发丝分界线，现在线就不再压过课名
+            if (hb.active && hb.label == null && hb.session.dayOfWeek == todayDayOfWeek
+                    && y >= hb.rect.top && y <= hb.rect.bottom && liveProgress(hb.session) >= 0f) return;
+        }
         accentPaint.setStyle(Paint.Style.FILL);
-        accentPaint.setColor(ACCENT);
+        accentPaint.setColor(G.alarm());
         canvas.drawRect(x0, y - dp(0.6f), x0 + colWidth, y + dp(0.6f), accentPaint);
-        if (G.GLASS) accentPaint.setColor(INK);
         canvas.drawCircle(x0 + dp(1), y, dp(3), accentPaint);
     }
 
@@ -902,7 +934,7 @@ public class TimetableView extends View {
      * 中间写剩几分钟。课块太矮放不下圆环时，改成右下角一行「N分后」，不让有的课有、有的课没有。
      */
     private void drawCountdown(Canvas canvas, RectF rect, int minutes) {
-        int color = G.GLASS ? INK : ACCENT;
+        int color = G.alarm();
         float r = dp(8f);
         float cx = rect.right - r - dp(3f);
         float cy = rect.bottom - r - dp(3f);
@@ -1017,7 +1049,7 @@ public class TimetableView extends View {
     }
 
     private void drawBlockText(Canvas canvas, RectF rect, Timetable.Course course,
-                               Timetable.Session s, boolean isActive, int textColor, String tag) {
+                               Timetable.Session s, boolean isActive, int textColor, String tag, int liveLeft) {
         float innerLeft = rect.left + (isActive ? dp(6.2f) : dp(4.0f));
         float innerRight = rect.right - dp(2.2f);
         float innerWidth = Math.max(dp(16), innerRight - innerLeft);
@@ -1036,79 +1068,75 @@ public class TimetableView extends View {
         String title = course.name != null ? course.name : "";
         if (tag != null) title = tag + title;
         else if (!isActive) title = "[非本周] " + title;
+        int w = Math.round(innerWidth);
+        StaticLayout titleLayout = textLayout(title, textPaint, w, 3, 1.02f);
 
-        StaticLayout titleLayout = StaticLayout.Builder
-                .obtain(title, 0, title.length(), textPaint, Math.round(innerWidth))
-                .setAlignment(Layout.Alignment.ALIGN_NORMAL)
-                .setLineSpacing(0f, 1.02f)
-                .setIncludePad(false)
-                .setMaxLines(3)
-                .setEllipsize(TextUtils.TruncateAt.END)
-                .build();
+        // 下面几行都用真实字体量高度（衬线、加宽字距的系统字体会更高更宽），放不下就按优先级丢：
+        // 课程名（可省略号）> 教室 > 自定义时间 > 教师 > 进行中标签
+        TextPaint sub = bpSub;
+        sub.set(subTextPaint);
+        sub.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        sub.setTextSize(sp(8.2f));
+        sub.setColor(textColor);
+        sub.setAlpha(isActive ? 215 : 165);
+        sub.setTextAlign(Paint.Align.LEFT);
+        TextPaint mono = bpMono;
+        mono.set(sub);
+        mono.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.BOLD));
+        mono.setAlpha(isActive ? 235 : 165);
+
+        String loc = (s.location != null && !s.location.isEmpty()) ? ("@" + s.location) : "";
+        String tl = s.hasCustomTime() ? s.timeStart + "–" + s.timeEnd : "";
+        String teacher = s.teacherFor(currentWeek, course.teacher).trim();
+        StaticLayout locL = loc.isEmpty() ? null : textLayout(loc, sub, w, 2, 1f);
+        StaticLayout timeL = tl.isEmpty() ? null : textLayout(tl, mono, w, 2, 1f);
+        StaticLayout teacherL = teacher.isEmpty() ? null : textLayout(teacher, sub, w, 2, 1f);
+
+        // 正在上：一行标签放在教室正上方。宽够写「● 进行中 · 剩N分」，否则只写「剩N分」，再不行就不写（红框已经说明在上）
+        TextPaint tagCn = bpTagCn;
+        tagCn.set(sub);
+        tagCn.setTypeface(Typeface.DEFAULT_BOLD);
+        tagCn.setColor(G.alarm());
+        tagCn.setAlpha(255);
+        TextPaint tagNum = bpTagNum;
+        tagNum.set(tagCn);
+        tagNum.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.BOLD));
+        String tagPre = null;
+        if (liveLeft > 0) {
+            String n = String.valueOf(liveLeft);
+            if (tagWidth("● 进行中 · 剩", n, tagCn, tagNum) <= innerWidth) tagPre = "● 进行中 · 剩";
+            else if (tagWidth("剩", n, tagCn, tagNum) <= innerWidth) tagPre = "剩";
+        }
+        float tagH = tagPre == null ? 0f : tagCn.getFontMetrics().descent - tagCn.getFontMetrics().ascent;
+
+        float gap = dp(3f);
+        int titleLines = titleLayout.getLineCount();
+        float[] titleCum = new float[titleLines];
+        for (int i = 0; i < titleLines; i++) titleCum[i] = titleLayout.getLineBottom(i);
+        int[] plan = blockPlan(innerBottom - innerTop, titleCum, gap,
+                locL == null ? 0f : locL.getHeight(),
+                timeL == null ? 0f : timeL.getHeight(),
+                teacherL == null ? 0f : teacherL.getHeight(),
+                tagH);
+        if (plan[0] < titleLines) titleLayout = textLayout(title, textPaint, w, plan[0], 1.02f);
 
         canvas.translate(innerLeft, innerTop);
         titleLayout.draw(canvas);
-
-        float usedHeight = titleLayout.getHeight();
-
-        // 自定义时间（如考试）直接写在课程名下面
-        if (s.hasCustomTime() && innerTop + usedHeight + dp(12) <= innerBottom) {
-            subTextPaint.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.BOLD));
-            subTextPaint.setTextSize(sp(8.2f));
-            subTextPaint.setColor(textColor);
-            subTextPaint.setAlpha(isActive ? 235 : 165);
-            subTextPaint.setTextAlign(Paint.Align.LEFT);
-            String tl = s.timeStart + "–" + s.timeEnd;
-            canvas.translate(0, usedHeight + dp(3f));
-            StaticLayout timeLayout = StaticLayout.Builder
-                    .obtain(tl, 0, tl.length(), subTextPaint, Math.round(innerWidth))
-                    .setIncludePad(false).setMaxLines(2).build();
-            timeLayout.draw(canvas);
-            canvas.translate(0, -(usedHeight + dp(3f)));
-            usedHeight += dp(3f) + timeLayout.getHeight();
+        float y = titleLayout.getHeight();
+        if ((plan[1] & 2) != 0) y = drawAt(canvas, timeL, y + gap);
+        if ((plan[1] & 4) != 0) y = drawAt(canvas, teacherL, y + gap);
+        if ((plan[1] & 8) != 0) {
+            float base = y + gap - tagCn.getFontMetrics().ascent;
+            float x = 0f;
+            canvas.drawText(tagPre, x, base, tagCn);
+            x += tagCn.measureText(tagPre);
+            String n = String.valueOf(liveLeft);
+            canvas.drawText(n, x, base, tagNum);
+            x += tagNum.measureText(n);
+            canvas.drawText("分", x, base, tagCn);
+            y += gap + tagH;
         }
-
-        // 教师名紧随课程名；按周换老师的课显示本周那位。为空时完全跳过。
-        String teacher = s.teacherFor(currentWeek, course.teacher).trim();
-        if (!teacher.isEmpty() && innerTop + usedHeight + dp(12) <= innerBottom) {
-            subTextPaint.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-            subTextPaint.setTextSize(sp(8.2f));
-            subTextPaint.setColor(textColor);
-            subTextPaint.setAlpha(isActive ? 215 : 165);
-            subTextPaint.setTextAlign(Paint.Align.LEFT);
-
-            canvas.translate(0, usedHeight + dp(3f));
-            StaticLayout teacherLayout = StaticLayout.Builder
-                    .obtain(teacher, 0, teacher.length(), subTextPaint, Math.round(innerWidth))
-                    .setAlignment(Layout.Alignment.ALIGN_NORMAL)
-                    .setLineSpacing(0f, 1.0f)
-                    .setIncludePad(false)
-                    .setMaxLines(2)
-                    .setEllipsize(TextUtils.TruncateAt.END)
-                    .build();
-            teacherLayout.draw(canvas);
-            usedHeight += dp(3f) + teacherLayout.getHeight();
-        }
-
-        String loc = (s.location != null && !s.location.isEmpty()) ? ("@" + s.location) : "";
-        if (!loc.isEmpty() && innerTop + usedHeight + dp(12) <= innerBottom) {
-            subTextPaint.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-            subTextPaint.setTextSize(sp(8.2f));
-            subTextPaint.setColor(textColor);
-            subTextPaint.setAlpha(isActive ? 215 : 165);
-            subTextPaint.setTextAlign(Paint.Align.LEFT);
-
-            canvas.translate(0, usedHeight + dp(3f));
-            StaticLayout locLayout = StaticLayout.Builder
-                    .obtain(loc, 0, loc.length(), subTextPaint, Math.round(innerWidth))
-                    .setAlignment(Layout.Alignment.ALIGN_NORMAL)
-                    .setLineSpacing(0f, 1.0f)
-                    .setIncludePad(false)
-                    .setMaxLines(2)
-                    .setEllipsize(TextUtils.TruncateAt.END)
-                    .build();
-            locLayout.draw(canvas);
-        }
+        if ((plan[1] & 1) != 0) drawAt(canvas, locL, y + gap);
 
         canvas.restore();
 
@@ -1117,6 +1145,60 @@ public class TimetableView extends View {
             badgePaint.setColor(ACCENT);
             canvas.drawCircle(rect.right - dp(6f), rect.bottom - dp(6f), dp(2.6f), badgePaint);
         }
+        // 缺勤快到上限（缺勤安全气囊）：左缘一条朱砂竖线
+        if (isActive && !warnCourses.isEmpty()
+                && warnCourses.contains(com.ecut.campus.data.AbsenceBook.key(course.name))) {
+            badgePaint.setColor(G.alarm());
+            canvas.drawRect(rect.left, rect.top + dp(2f), rect.left + dp(2.4f), rect.bottom - dp(2f), badgePaint);
+        }
+    }
+
+    private static StaticLayout textLayout(String t, TextPaint p, int width, int maxLines, float mult) {
+        return StaticLayout.Builder.obtain(t, 0, t.length(), p, Math.max(1, width))
+                .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, mult)
+                .setIncludePad(false)
+                .setMaxLines(Math.max(1, maxLines))
+                .setEllipsize(TextUtils.TruncateAt.END)
+                .build();
+    }
+
+    private static float drawAt(Canvas canvas, StaticLayout l, float y) {
+        canvas.save();
+        canvas.translate(0, y);
+        l.draw(canvas);
+        canvas.restore();
+        return y + l.getHeight();
+    }
+
+    private static float tagWidth(String pre, String num, TextPaint cn, TextPaint mono) {
+        return cn.measureText(pre) + mono.measureText(num) + cn.measureText("分");
+    }
+
+    /**
+     * 课块里放哪些行。titleCum[i] = 课程名前 i+1 行的高度；items 按优先级排在课程名之后
+     * （0 = 没有这一行），依次是 教室、自定义时间、教师、标签。
+     * 先保证教室：放不下就把课程名往少里压（至少 1 行），再不行才丢教室；其余按顺序能放就放。
+     * 返回 {课程名行数, 位掩码（第 i 位 = 第 i 项显示）}。
+     */
+    static int[] blockPlan(float avail, float[] titleCum, float gap, float... items) {
+        int n = Math.max(1, titleCum.length);
+        float th = titleCum.length == 0 ? 0f : titleCum[n - 1];
+        int mask = 0;
+        float used;
+        if (items.length > 0 && items[0] > 0f) {
+            while (n > 1 && titleCum[n - 1] + gap + items[0] > avail) n--;
+            th = titleCum.length == 0 ? 0f : titleCum[n - 1];
+            if (th + gap + items[0] <= avail) mask |= 1;
+        }
+        used = th + ((mask & 1) != 0 ? gap + items[0] : 0f);
+        for (int i = 1; i < items.length; i++) {
+            if (items[i] > 0f && used + gap + items[i] <= avail) {
+                mask |= 1 << i;
+                used += gap + items[i];
+            }
+        }
+        return new int[]{n, mask};
     }
 
     private void drawScrollHint(Canvas canvas, int w, int h) {

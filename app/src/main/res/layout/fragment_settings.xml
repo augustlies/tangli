@@ -324,6 +324,35 @@
                 <TextView
                     style="@style/G.RowChevron" />
             </LinearLayout>
+
+            <View style="@style/G.Hair" />
+
+            <LinearLayout
+                android:id="@+id/row_settings_fun"
+                style="@style/G.Row.Tight">
+
+                <TextView
+                    style="@style/G.RowIndex"
+                    android:text="06" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        style="@style/G.RowTitle"
+                        android:text="小玩意" />
+
+                    <TextView
+                        style="@style/G.RowSub"
+                        android:text="翻牌批语 · 这节课多少钱 · 人设卡 · 双人海报" />
+                </LinearLayout>
+
+                <TextView
+                    style="@style/G.RowChevron" />
+            </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -677,6 +706,159 @@
 
         <TextView
             style="@style/G.SectionLabel"
+            android:text="WIDGET · 桌面组件" />
+        <com.google.android.material.card.MaterialCardView
+            style="@style/G.Card">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/row_widget_pin"
+                style="@style/G.Row">
+
+                <TextView
+                    style="@style/G.RowIndex"
+                    android:text="01" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        style="@style/G.RowTitle"
+                        android:text="添加桌面组件" />
+
+                    <TextView
+                        android:id="@+id/tv_widget_pin_sub"
+                        style="@style/G.RowSub"
+                        android:text="今日课程，4×2 或拉成 2×2，放到桌面一眼就知道" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="＋"
+                    android:textColor="?attr/gMute"
+                    android:textSize="18sp" />
+            </LinearLayout>
+
+            <View style="@style/G.Hair" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="18dp"
+                android:paddingTop="14dp"
+                android:paddingEnd="18dp"
+                android:paddingBottom="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        style="@style/G.RowIndex"
+                        android:layout_marginTop="3dp"
+                        android:text="02" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/G.RowTitle"
+                            android:text="组件背景" />
+
+                        <TextView
+                            android:id="@+id/tv_widget_bg_sub"
+                            style="@style/G.RowSub"
+                            android:text="默认纸色" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/seg_widget_bg"
+                    android:layout_width="match_parent"
+                    android:layout_height="38dp"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal" />
+
+                <LinearLayout
+                    android:id="@+id/box_widget_mask"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="遮罩"
+                            android:textColor="?attr/gInk"
+                            android:textSize="13.5sp" />
+
+                        <SeekBar
+                            android:id="@+id/seek_widget_mask"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:contentDescription="遮罩强度"
+                            android:max="85"
+                            android:progressBackgroundTint="?attr/gLine"
+                            android:progressTint="?attr/gInk"
+                            android:thumbTint="?attr/gInk" />
+
+                        <TextView
+                            android:id="@+id/tv_widget_mask"
+                            android:layout_width="38dp"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="monospace"
+                            android:gravity="end"
+                            android:text="35%"
+                            android:textColor="?attr/gSub"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tv_widget_bg_hint"
+                        style="@style/G.RowSub"
+                        android:layout_width="match_parent"
+                        android:text="遮罩越高，字越清楚；字的深浅会跟着图自动换" />
+
+                    <TextView
+                        android:id="@+id/btn_widget_bg_reset"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="end"
+                        android:layout_marginTop="8dp"
+                        android:background="?attr/selectableItemBackground"
+                        android:padding="6dp"
+                        android:text="恢复默认"
+                        android:textColor="?attr/gAccent"
+                        android:textSize="13sp" />
+                </LinearLayout>
+            </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            style="@style/G.SectionLabel"
             android:text="NOTIFY · 通知" />
         <com.google.android.material.card.MaterialCardView
             style="@style/G.Card">
@@ -714,6 +896,37 @@
                         android:layout_height="wrap_content" />
                 </LinearLayout>
 
+                <LinearLayout
+                    android:id="@+id/row_class_remind"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/G.RowTitle"
+                            android:text="上课前提醒" />
+
+                        <TextView
+                            android:id="@+id/tv_class_remind_sub"
+                            style="@style/G.RowSub"
+                            android:text="提前 10 分钟通知课程和教室" />
+                    </LinearLayout>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switch_class_remind"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+                </LinearLayout>
+
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -744,15 +957,6 @@
                     android:layout_marginTop="12dp"
                     android:orientation="horizontal">
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_seed_demo_all"
-                    android:visibility="gone"
-                        style="@style/Gauge.Button.Outline"
-                        android:layout_width="0dp"
-                        android:layout_height="42dp"
-                        android:layout_weight="1"
-                        android:text="载入演示数据"
-                        android:textSize="12.5sp" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_clear_local_data"

@@ -203,7 +203,10 @@ final class CommandUi {
             if (root != null) root.postDelayed(go, 250);
             else go.run();
         }
-        if (themeChanged) App.applyNightMode(Prefs.nightMode(a));
+        if (themeChanged) {
+            ClassWidget.updateAll(a.getApplicationContext());
+            App.applyNightMode(Prefs.nightMode(a));
+        }
     }
 
     private static void undoBar(Activity a, String msg, Timetable before, Runnable refresh) {
@@ -326,6 +329,27 @@ final class CommandUi {
                 .setMessage("粘贴给任意 AI（豆包、DeepSeek、Kimi、ChatGPT…），在末尾说你想怎么改，"
                         + "比如「下周三下午加一场地质学考试，14:30 到 16:30，在 3-402」，也可以附上课表截图。\n\n"
                         + "把 AI 回复的指令复制下来，回到烫梨就会自动弹出预览，确认后才生效。")
+                .setPositiveButton("知道了", null)
+                .show();
+    }
+
+    /**
+     * 「交给 AI 读」：烫梨读不了的教务页面，把页面文字（已抹掉姓名学号）+ 说明一起复制，
+     * 用户发给任意 AI，再把 AI 回的整表指令复制回来，回到课表页就会弹出预览。
+     */
+    static void copyPageForAi(Activity a, String pageRaw) {
+        String page = com.ecut.campus.data.PageTextForAi.clean(pageRaw);
+        if (page.length() < 20) {
+            android.widget.Toast.makeText(a, "这个页面上没读到课表文字，先打开课表那一页再试", android.widget.Toast.LENGTH_LONG).show();
+            return;
+        }
+        Timetable t = TimetableStore.load(a);
+        copy(a, "烫梨 · 给 AI 的课表页面", com.ecut.campus.data.AiGuide.buildFromPage(t, env(a, t), sectionTimes(a), page));
+        new AlertDialog.Builder(a)
+                .setTitle("已复制，发给 AI 吧")
+                .setMessage("粘贴给豆包、DeepSeek、Kimi 等任意 AI，它会回一段「烫梨指令」。"
+                        + "把那段指令复制下来，回到烫梨课表页就会弹出预览，确认后才会替换现在的课表。\n\n"
+                        + "复制的内容有课程、老师、教室，已经去掉姓名、学号、手机号；发之前可以先看一眼。")
                 .setPositiveButton("知道了", null)
                 .show();
     }

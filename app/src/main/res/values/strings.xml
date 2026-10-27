@@ -1,11 +1,10 @@
 <resources>
     <string name="app_name">烫梨</string>
-    <string name="tab_timetable">课表</string>
-    <string name="tab_grades">成绩</string>
-    <string name="tab_adblock">拦截</string>
-    <string name="tab_settings">设置</string>
     <string name="adblock_on">护盾运行中</string>
     <string name="adblock_off">护盾已待机</string>
-    <string name="adblock_start">开启拦截</string>
-    <string name="adblock_stop">关闭拦截</string>
+    <string name="shortcut_pin_widget">添加今日课程组件</string>
+    <string name="widget_classes_placeholder_top">烫梨 · 今日课程</string>
+    <string name="widget_classes_placeholder_hint">点一下打开烫梨</string>
+    <string name="widget_classes_desc">今天还要上的课，一门一条；上完了显示明天第一节</string>
+    <string name="widget_preview_title">今日周二，还有 <font color="#FF4A1C">2</font> 门课要上</string>
 </resources>

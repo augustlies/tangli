@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 添加桌面组件的小卡片（半透明页面，卡片底色 / 圆角在 PinWidgetActivity 里按纸墨 / 玻璃主题设置） -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/pin_scrim"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#66000000">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:fillViewport="false">
+
+        <LinearLayout
+            android:id="@+id/pin_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="24dp"
+            android:layout_marginTop="40dp"
+            android:layout_marginEnd="24dp"
+            android:layout_marginBottom="40dp"
+            android:clickable="true"
+            android:focusable="false"
+            android:orientation="vertical"
+            android:padding="22dp">
+
+            <TextView
+                android:id="@+id/pin_kicker"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:letterSpacing="0.12"
+                android:text="WIDGET · 桌面组件"
+                android:textColor="?attr/gMute"
+                android:textSize="11sp" />
+
+            <ImageView
+                android:id="@+id/pin_preview"
+                android:layout_width="match_parent"
+                android:layout_height="132dp"
+                android:layout_marginTop="14dp"
+                android:adjustViewBounds="true"
+                android:contentDescription="小组件预览"
+                android:scaleType="fitCenter" />
+
+            <TextView
+                android:id="@+id/pin_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:textColor="?attr/gInk"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/pin_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:lineSpacingExtra="3dp"
+                android:textColor="?attr/gSub"
+                android:textSize="13.5sp" />
+
+            <TextView
+                android:id="@+id/pin_steps"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:lineSpacingExtra="4dp"
+                android:textColor="?attr/gSub2"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_pin_primary"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="20dp"
+                android:text="添加到桌面" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_pin_secondary"
+                style="@style/Gauge.Button.Outline"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:text="再试一次"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/btn_pin_try"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="6dp"
+                android:background="?attr/selectableItemBackground"
+                android:gravity="center"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:text="仍然试试一键添加"
+                android:textColor="?attr/gSub"
+                android:textSize="13.5sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/btn_pin_close"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="6dp"
+                android:background="?attr/selectableItemBackground"
+                android:gravity="center"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:text="关闭"
+                android:textColor="?attr/gMute"
+                android:textSize="13.5sp" />
+        </LinearLayout>
+    </ScrollView>
+</FrameLayout>

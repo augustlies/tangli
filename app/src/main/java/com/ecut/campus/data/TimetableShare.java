@@ -13,7 +13,7 @@ import java.util.zip.Deflater;
 import java.util.zip.Inflater;
 
 /**
- * 课表分享码：只带课程名、地点、时间和周次（不带教师、学号等），
+ * 课表分享码：只带课程名、地点、时间和周次（不带教师、学号等），1.2.6 起可附带作息时间，
  * 压缩后 base64url，前缀「烫梨课表1:」。可做成二维码或直接发文字。
  */
 public final class TimetableShare {
@@ -27,10 +27,18 @@ public final class TimetableShare {
         public String semesterId = "";
         public String startDate = "";
         public Timetable timetable;
+        /** 分享者的作息（紧凑格式 {f, n, d[], b[]}），旧版分享码没有则为 null。 */
+        public JSONObject schedule;
     }
 
     public static String encode(Timetable t, String owner) throws JSONException {
+        return encode(t, owner, null);
+    }
+
+    /** @param schedule 作息（紧凑格式），可空；旧版烫梨解析时会忽略这个字段 */
+    public static String encode(Timetable t, String owner, JSONObject schedule) throws JSONException {
         JSONObject o = new JSONObject();
+        if (schedule != null) o.put("w", schedule);
         o.put("o", owner == null ? "" : owner);
         o.put("s", t.semester.id);
         o.put("d", t.semester.startDate);
@@ -87,6 +95,7 @@ public final class TimetableShare {
             sh.owner = o.optString("o", "");
             sh.semesterId = o.optString("s", "");
             sh.startDate = o.optString("d", "");
+            sh.schedule = o.optJSONObject("w");
             Timetable t = new Timetable();
             t.semester.id = sh.semesterId;
             t.semester.startDate = sh.startDate;

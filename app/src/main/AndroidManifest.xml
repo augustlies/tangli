@@ -8,10 +8,15 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <queries>
         <package android:name="com.tencent.mm" />
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
     </queries>
 
     <application
@@ -41,7 +46,20 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="tangli" />
             </intent-filter>
+            <!-- 长按图标：「添加今日课程组件」 -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
+
+        <!-- 添加桌面组件的小卡片（半透明）：前台请桌面放置，等回调；没弹窗就给权限入口和手动步骤。由快捷方式（桌面启动）打开，所以 exported -->
+        <activity
+            android:name=".PinWidgetActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Tangli.PinCard" />
 
         <activity
             android:name=".WebShellActivity"
@@ -114,6 +132,12 @@
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
+            android:name=".fun.FunActivity"
+            android:exported="false"
+            android:label="小玩意"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
             android:name=".ClassmatesActivity"
             android:exported="false"
             android:label="同学"
@@ -165,6 +189,36 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".ClassWidget"
+            android:exported="false"
+            android:label="今日课程">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_classes_info" />
+        </receiver>
+
+        <!-- 小组件「今日课程」里的课程列表（只有系统桌面能绑定） -->
+        <service
+            android:name=".ClassWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+
+        <!-- 课前提醒：自己排的闹钟 + 开机/改时间/升级后重排（默认关，关着时只是空跑一下） -->
+        <receiver
+            android:name=".ClassReminder$Receiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
 

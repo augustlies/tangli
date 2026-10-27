@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 桌面小组件「今日课程」配色。课程条 = 课表同色板：日间取浅色底再提亮 35%，夜间取深色字压到卡片底 60%。 -->
+<resources>
+    <color name="w_card">#F8F7F3</color>
+    <color name="w_stroke">#0F000000</color>
+    <color name="w_ink">#111111</color>
+    <color name="w_sub">#77766F</color>
+    <color name="w_chip_sub">#55554F</color>
+    <color name="w_accent">#FF4A1C</color>
+    <color name="w_pig0">#F5ECDE</color>
+    <color name="w_pig1">#E9EEE4</color>
+    <color name="w_pig2">#F5E6E0</color>
+    <color name="w_pig3">#E8ECEF</color>
+    <color name="w_pig4">#EDEAF3</color>
+    <color name="w_pig5">#E4EFED</color>
+    <color name="w_pig6">#F6E8EA</color>
+    <color name="w_pig7">#EDECE8</color>
+    <color name="w_pig8">#F1EDDC</color>
+    <color name="w_pig9">#E6EBE0</color>
+    <color name="w_pig10">#F0E4DE</color>
+    <color name="w_pig11">#E6E8ED</color>
+    <color name="w_pig12">#EDCFCF</color>
+    <color name="w_pig13">#EDE0CF</color>
+    <color name="w_pig14">#E3EDCF</color>
+    <color name="w_pig15">#CFEDCF</color>
+    <color name="w_pig16">#D6F0DE</color>
+    <color name="w_pig17">#D6F0F0</color>
+    <color name="w_pig18">#CFE6ED</color>
+    <color name="w_pig19">#CFCFED</color>
+    <color name="w_pig20">#DCDBEC</color>
+    <color name="w_pig21">#EBCFED</color>
+    <color name="w_pig22">#F3DDF3</color>
+    <color name="w_pig23">#E8D4DE</color>
+</resources>

@@ -21,7 +21,7 @@ export PATH="$JAVA_HOME/bin:$PATH"
 ./gradlew testReleaseUnitTest --console=plain
 ```
 
-改完代码**必须跑测试**（当前 157 个，应全绿）。
+改完代码**必须跑测试**（当前 279 个，应全绿）。
 
 ## 装到真机
 

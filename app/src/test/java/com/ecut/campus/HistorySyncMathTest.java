@@ -17,7 +17,7 @@ public class HistorySyncMathTest {
         g.semesters.add(sem("2025-2026-2"));
         g.semesters.add(sem("2024-2025-1"));
         g.semesters.add(sem("2024-2025-2"));
-        assertEquals(2024, MainActivity.earliestGradeYear(g));
+        assertEquals(2024, HistorySync.earliestGradeYear(g));
     }
 
     @Test
@@ -25,23 +25,23 @@ public class HistorySyncMathTest {
         Grades g = info();
         g.semesters.add(sem("2024-2025-1"));
         g.semesters.add(sem("2025-2026-1"));
-        assertEquals(2025, MainActivity.earliestGradeYear(g));
+        assertEquals(2025, HistorySync.earliestGradeYear(g));
     }
 
     @Test
     public void singleEntryList() {
         Grades g = info();
         g.semesters.add(sem("2026-2027-1"));
-        assertEquals(2026, MainActivity.earliestGradeYear(g));
+        assertEquals(2026, HistorySync.earliestGradeYear(g));
     }
 
     @Test
     public void emptyOrInvalidReturnsMinusOne() {
-        assertEquals(-1, MainActivity.earliestGradeYear(info()));
-        assertEquals(-1, MainActivity.earliestGradeYear(null));
+        assertEquals(-1, HistorySync.earliestGradeYear(info()));
+        assertEquals(-1, HistorySync.earliestGradeYear(null));
         Grades bad = info();
         bad.semesters.add(sem("garbage"));
-        assertEquals(-1, MainActivity.earliestGradeYear(bad));
+        assertEquals(-1, HistorySync.earliestGradeYear(bad));
     }
 
     @Test
@@ -50,7 +50,7 @@ public class HistorySyncMathTest {
         t.courses.add(courseWithWeeks("1-16周", 2));
         t.courses.add(courseWithWeeks("1-16周", 2));
         t.courses.add(courseWithWeeks("3-18周", 1));
-        assertEquals(3, MainActivity.busiestWeek(t));
+        assertEquals(3, com.ecut.campus.data.TimetableStats.busiestWeek(t));
     }
 
     @Test
@@ -58,13 +58,13 @@ public class HistorySyncMathTest {
         com.ecut.campus.data.Timetable t = new com.ecut.campus.data.Timetable();
         t.courses.add(courseWithWeeks("5-8周", 1));
         t.courses.add(courseWithWeeks("9-12周", 1));
-        assertEquals(5, MainActivity.busiestWeek(t));
+        assertEquals(5, com.ecut.campus.data.TimetableStats.busiestWeek(t));
     }
 
     @Test
     public void busiestWeekEmptyTimetableReturnsOne() {
-        assertEquals(1, MainActivity.busiestWeek(new com.ecut.campus.data.Timetable()));
-        assertEquals(1, MainActivity.busiestWeek(null));
+        assertEquals(1, com.ecut.campus.data.TimetableStats.busiestWeek(new com.ecut.campus.data.Timetable()));
+        assertEquals(1, com.ecut.campus.data.TimetableStats.busiestWeek(null));
     }
 
     private static com.ecut.campus.data.Timetable.Course courseWithWeeks(
