@@ -601,6 +601,14 @@ public class WebShellActivity extends AppCompatActivity {
         if (res.failedWeekExpr > 0) {
             msg.append("\n\n有 ").append(res.failedWeekExpr).append(" 处上课周没认出来，导入后请核对。");
         }
+        com.ecut.campus.data.ImportCheck.Result check = com.ecut.campus.data.ImportCheck.check(res.timetable);
+        String crowd = com.ecut.campus.data.ImportCheck.warning(check);
+        if (!crowd.isEmpty()) {
+            msg.append("\n\n").append(crowd);
+            DiagLog.log(this, "import", "自检: 拥挤时段 " + check.crowdedSlots + " 最多同时 " + check.maxTogether
+                    + " 门 · 最大节次 " + check.maxSection);
+        }
+        boolean offerLog = res.failedWeekExpr > 0 || !crowd.isEmpty();
         if (diff != null && !diff.isEmpty()) msg.append("\n\n和现在的课表相比：\n").append(diff);
         String start = merged.semester.startDate;
         if (!school.isEcut()) {
@@ -609,7 +617,9 @@ public class WebShellActivity extends AppCompatActivity {
         }
         if (otherSemester) msg.append("\n\n这不是当前学期，会存到历史学期里，当前课表不变。");
         msg.append("\n\n导入会替换之前从教务导入的课程，你自己添加的课程会保留。");
-        new androidx.appcompat.app.AlertDialog.Builder(this)
+        androidx.appcompat.app.AlertDialog.Builder preview = new androidx.appcompat.app.AlertDialog.Builder(this);
+        if (offerLog) preview.setNeutralButton("发给开发者", (d, w) -> exportPageSample());
+        preview
                 .setTitle("导入这份课表？")
                 .setMessage(msg.toString())
                 .setNegativeButton("取消", null)
@@ -651,13 +661,13 @@ public class WebShellActivity extends AppCompatActivity {
         String msg = (detail != null ? detail + "\n\n" : "烫梨还读不了这个页面的课表。\n\n")
                 + "可以「交给 AI 读」：在课表那一页点它，烫梨把页面文字（去掉姓名学号）连同说明一起复制，"
                 + "发给任意 AI 换成烫梨指令再导回来。\n\n"
-                + "也可以导出一份「页面结构样本」帮忙适配你的学校：只记网页用了哪些标签和字段名，"
-                + "不含姓名、学号等文字，会附在诊断日志里一起分享。";
+                + "也可以点「发给开发者」一键上传错误日志，帮忙适配你的学校：会附一份页面结构样本，"
+                + "只记网页用了哪些标签和字段名，不含姓名、学号等文字。";
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle(detail != null ? "没读到课表" : "暂不支持这个教务系统")
                 .setMessage(msg)
                 .setNegativeButton("关闭", null)
-                .setNeutralButton("导出结构样本", (d, w) -> exportPageSample())
+                .setNeutralButton("发给开发者", (d, w) -> exportPageSample())
                 .setPositiveButton("交给 AI 读", (d, w) -> copyPageForAi())
                 .show();
     }
@@ -683,7 +693,7 @@ public class WebShellActivity extends AppCompatActivity {
             }
             DiagLog.savePageSample(this, sample);
             DiagLog.log(this, "import", "已保存页面结构样本 " + sample.length() + " 字 · " + school.diagSummary());
-            DiagLog.export(this);
+            DiagLog.upload(this);
         });
     }
 

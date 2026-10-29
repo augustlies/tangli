@@ -364,7 +364,7 @@ public class GradesActivity extends AppCompatActivity {
                     @Override
                     public void onFailure(String message) {
                         activeSync = null;
-                        Toast.makeText(GradesActivity.this, message, Toast.LENGTH_LONG).show();
+                        DiagLog.failDialog(GradesActivity.this, "成绩没同步成功", message);
                     }
                 });
     }

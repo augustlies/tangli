@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#ECEAE4</color>
+    <!-- 默认图标「刻度梨」的底色 -->
+    <color name="ic_launcher_pear_background">#F5F4F0</color>
     <!-- Gauge 纸墨色板（浅色）。深色见 values-night/colors.xml -->
     <color name="g_paper">#F5F4F0</color>
     <color name="g_card">#FBFAF7</color>

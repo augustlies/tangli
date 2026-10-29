@@ -7,4 +7,13 @@
     <string name="widget_classes_placeholder_hint">点一下打开烫梨</string>
     <string name="widget_classes_desc">今天还要上的课，一门一条；上完了显示明天第一节</string>
     <string name="widget_preview_title">今日周二，还有 <font color="#FF4A1C">2</font> 门课要上</string>
+    <!-- 应用图标选项（设置 → 通用 → 应用图标） -->
+    <string name="app_icon_pear">刻度梨</string>
+    <string name="app_icon_art">大肥鱼</string>
+    <string name="app_icon_hint">有的桌面要等几秒，或重启桌面/手机后图标才会变。</string>
+    <!-- 更新后第一次打开的「新版本说明」弹窗（只给老用户看，新装不弹）。文案待定，改这里即可 -->
+    <string name="whats_new_title">烫梨 1.2.7 更新了什么</string>
+    <string name="whats_new_body">烫梨换了新图标：刻度梨。原来的小人是同人二创角色，不适合一直当门面，所以换成烫梨自己的标志。想要之前的大肥鱼的话，设置里『应用图标』可以换回来。\n\n这次还有：\n· 通知栏常驻「下一节课」（默认关，设置 → 通用 → 通知里打开）\n· 发邮件反馈时自动附上诊断日志（不含学号、姓名、Cookie）</string>
+    <string name="whats_new_go_icon">去换图标</string>
+    <string name="whats_new_ok">知道了</string>
 </resources>

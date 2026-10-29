@@ -101,8 +101,12 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
             if (tab == TAB_SETTINGS && page > 0 && page != R.id.settings_page_root) settings.showPage(page);
         }
         ThemeReveal.play(this);
+        // 图标选择和组件状态对不上时（备份恢复到新手机等）补一下；正常启动什么都不做
+        AppIcon.sync(getApplicationContext());
+        // 从老版本升上来的第一次打开：先弹「新版本说明」，这次就不再弹检查更新，免得两个弹窗叠在一起
+        boolean whatsNew = maybeShowWhatsNew(container);
         // 首帧画完再去查更新（联网 + 可能弹窗），不挡冷启动
-        container.postDelayed(() -> {
+        if (!whatsNew) container.postDelayed(() -> {
             if (!isFinishing()) Updater.autoCheck(this);
         }, 1500);
         // 从 tangli:// 链接冷启动
@@ -110,6 +114,36 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
         if (launch != null && (launch.getData() != null || launch.hasExtra(AppActions.EXTRA_ACTION))) {
             container.post(() -> handleExternalIntent(launch));
         }
+    }
+
+    /**
+     * 更新后第一次打开的「新版本说明」（只给从老版本升上来的人，新装不弹）。文案在 res/values/strings.xml 的 whats_new_*。
+     * 不管弹不弹，都记下这次的 versionCode。返回 true 表示要弹。
+     */
+    private boolean maybeShowWhatsNew(View anchor) {
+        boolean upgraded = false;
+        try {
+            android.content.pm.PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
+            upgraded = com.ecut.campus.data.WhatsNew.isUpgrade(pi.firstInstallTime, pi.lastUpdateTime);
+        } catch (Exception ignored) {
+        }
+        boolean show = com.ecut.campus.data.WhatsNew.shouldShow(Prefs.lastSeenVersionCode(this),
+                BuildConfig.VERSION_CODE, upgraded);
+        Prefs.setLastSeenVersionCode(this, BuildConfig.VERSION_CODE);
+        if (!show) return false;
+        anchor.postDelayed(() -> {
+            if (isFinishing()) return;
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle(R.string.whats_new_title)
+                    .setMessage(R.string.whats_new_body)
+                    .setNegativeButton(R.string.whats_new_go_icon, (d, w) -> {
+                        showTab(TAB_SETTINGS);
+                        if (settings != null) settings.revealAppIcon();
+                    })
+                    .setPositiveButton(R.string.whats_new_ok, null)
+                    .show();
+        }, 700);
+        return true;
     }
 
     @Override
@@ -644,7 +678,7 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
                                     .setPositiveButton("去登录", (d, w) -> openWeb("portal"))
                                     .show();
                         } else {
-                            Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show();
+                            DiagLog.failDialog(MainActivity.this, kind.label + "没同步成功", message);
                         }
                     }
                 });

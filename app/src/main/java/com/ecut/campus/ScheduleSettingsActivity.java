@@ -275,7 +275,7 @@ public class ScheduleSettingsActivity extends AppCompatActivity {
         int cur;
         try { cur = Integer.parseInt(target.getText().toString().trim()); } catch (Exception e) { cur = duration ? 45 : 10; }
         com.ecut.campus.view.RulerDialView dial = new com.ecut.campus.view.RulerDialView(this);
-        dial.configure(duration ? 5 : 0, duration ? 180 : 120, cur, "分钟");
+        dial.configure(duration ? 5 : 0, duration ? 180 : 300, cur, "分钟");
         LinearLayout box = new LinearLayout(this);
         box.setPadding(dp(8), dp(4), dp(8), 0);
         box.addView(dial, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,

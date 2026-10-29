@@ -64,6 +64,7 @@ final class SettingsTab {
         View icsRow = settingsFragment.findViewById(R.id.row_export_ics);
         if (icsRow != null) icsRow.setOnClickListener(v -> a.exportIcs());
         bindClassRemind();
+        bindNextClassNotice();
         com.google.android.material.materialswitch.MaterialSwitch gradeSw =
                 settingsFragment.findViewById(R.id.switch_grade_notify);
         if (gradeSw != null) {
@@ -76,6 +77,7 @@ final class SettingsTab {
         }
         renderThemeSegment();
         renderNightSegment();
+        renderAppIcon();
         bindWidget();
 
         View gradesCard = settingsFragment.findViewById(R.id.card_settings_grades);
@@ -537,5 +539,142 @@ final class SettingsTab {
                     .setNegativeButton("取消", null)
                     .show();
         });
+    }
+    // ===== 1.2.7：通知栏常驻「下一节课」（默认关） =====
+    private void bindNextClassNotice() {
+        com.google.android.material.materialswitch.MaterialSwitch sw =
+                settingsFragment.findViewById(R.id.switch_next_class_notice);
+        TextView sub = settingsFragment.findViewById(R.id.tv_next_class_notice_sub);
+        View row = settingsFragment.findViewById(R.id.row_next_class_notice);
+        if (sw == null) return;
+        sw.setOnCheckedChangeListener(null);
+        sw.setChecked(Prefs.nextClassNotice(a));
+        renderNextClassNoticeSub(sub);
+        sw.setOnCheckedChangeListener((b, on) -> {
+            Prefs.setNextClassNotice(a, on);
+            if (on) Notify.requestPermissionIfNeeded(a);
+            NextClassNotice.update(a.getApplicationContext());
+            renderNextClassNoticeSub(sub);
+        });
+        if (row != null) row.setOnClickListener(v -> sw.toggle());
+    }
+
+    private void renderNextClassNoticeSub(TextView sub) {
+        if (sub == null) return;
+        String t = "一条静音的常驻通知：课名、时间、教室";
+        if (Prefs.nextClassNotice(a) && !ClassReminder.canNotify(a)) t += " · 通知被关了，显示不出来";
+        else if (Prefs.nextClassNotice(a)) t += " · 今天上完显示明天第一节";
+        sub.setText(t);
+    }
+
+    // ===== 1.2.7：应用图标（刻度梨 / 大肥鱼，彩蛋：本本） =====
+    /** 两个并排的小卡片：图标预览 + 名字，选中的描墨色边。 */
+    void renderAppIcon() {
+        LinearLayout box = settingsFragment.findViewById(R.id.box_app_icon);
+        if (box == null) return;
+        box.removeAllViews();
+        float d = a.getResources().getDisplayMetrics().density;
+        com.ecut.campus.data.AppIconOption cur = AppIcon.current(a);
+        boolean unlocked = Prefs.benbenUnlocked(a) || cur == com.ecut.campus.data.AppIconOption.BENBEN;
+        com.ecut.campus.data.AppIconOption[] opts = com.ecut.campus.data.AppIconOption.visible(unlocked);
+        for (int i = 0; i < opts.length; i++) {
+            com.ecut.campus.data.AppIconOption o = opts[i];
+            boolean on = o == cur;
+            LinearLayout cell = new LinearLayout(a);
+            cell.setOrientation(LinearLayout.HORIZONTAL);
+            cell.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            int pad = Math.round(10 * d);
+            cell.setPadding(pad, pad, pad, pad);
+            GradientDrawable bg = new GradientDrawable();
+            bg.setCornerRadius((G.GLASS ? 16 : 6) * d);
+            if (G.GLASS) bg.setColor(G.CHIP);
+            bg.setStroke(Math.max(1, Math.round((on ? 2 : 1) * d)), on ? G.INK : G.STROKE);
+            cell.setBackground(bg);
+            cell.setContentDescription("应用图标：" + o.label + (on ? "，已选" : ""));
+
+            android.widget.ImageView iv = new android.widget.ImageView(a);
+            iv.setImageDrawable(iconPreview(o));
+            iv.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+            int sz = Math.round(40 * d);
+            cell.addView(iv, new LinearLayout.LayoutParams(sz, sz));
+
+            TextView tv = new TextView(a);
+            tv.setText(o == com.ecut.campus.data.AppIconOption.DEFAULT ? o.label + "\n默认" : o.label);
+            tv.setTextSize(13f);
+            tv.setTypeface(on ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+            tv.setTextColor(on ? G.INK : G.SUB);
+            LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            tlp.setMarginStart(Math.round(10 * d));
+            cell.addView(tv, tlp);
+
+            cell.setOnClickListener(v -> {
+                if (o == AppIcon.current(a)) {
+                    // 彩蛋：连点当前选中的卡片解锁「本本」
+                    if (unlocked) return;
+                    long now = android.os.SystemClock.uptimeMillis();
+                    if (now - lastIconTap > 1500) iconTaps = 0;
+                    lastIconTap = now;
+                    if (++iconTaps >= com.ecut.campus.data.AppIconOption.UNLOCK_TAPS) {
+                        iconTaps = 0;
+                        Prefs.setBenbenUnlocked(a);
+                        v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                        renderAppIcon();
+                        Toast.makeText(a, "你发现了本本 ✦", Toast.LENGTH_LONG).show();
+                    }
+                    return;
+                }
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
+                AppIcon.apply(a.getApplicationContext(), o);
+                renderAppIcon();
+                Toast.makeText(a, "图标换成「" + o.label + "」了，桌面可能要等几秒才变", Toast.LENGTH_LONG).show();
+            });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            if (i > 0) lp.setMarginStart(Math.round(10 * d));
+            box.addView(cell, lp);
+        }
+    }
+
+    /** 图标预览：8.0+ 是自适应图标，放大 1.5 倍只露中间那块（和桌面裁出来的差不多），再裁圆角。 */
+    private android.graphics.drawable.Drawable iconPreview(com.ecut.campus.data.AppIconOption o) {
+        int res = o == com.ecut.campus.data.AppIconOption.ART ? R.mipmap.ic_launcher_art
+                : o == com.ecut.campus.data.AppIconOption.BENBEN ? R.mipmap.ic_launcher_benben : R.mipmap.ic_launcher;
+        android.graphics.drawable.Drawable dr = androidx.core.content.ContextCompat.getDrawable(a, res);
+        if (dr == null) return null;
+        if (android.os.Build.VERSION.SDK_INT >= 26 && dr instanceof android.graphics.drawable.AdaptiveIconDrawable) {
+            android.graphics.drawable.AdaptiveIconDrawable ad = (android.graphics.drawable.AdaptiveIconDrawable) dr;
+            int px = Math.round(40 * a.getResources().getDisplayMetrics().density);
+            android.graphics.Bitmap bmp = android.graphics.Bitmap.createBitmap(px, px, android.graphics.Bitmap.Config.ARGB_8888);
+            android.graphics.Canvas cv = new android.graphics.Canvas(bmp);
+            android.graphics.Path clip = new android.graphics.Path();
+            float r = px * 0.24f;
+            clip.addRoundRect(0, 0, px, px, r, r, android.graphics.Path.Direction.CW);
+            cv.clipPath(clip);
+            int ext = Math.round(px * 0.25f);
+            android.graphics.drawable.Drawable[] layers = {ad.getBackground(), ad.getForeground()};
+            for (android.graphics.drawable.Drawable l : layers) {
+                if (l == null) continue;
+                l.setBounds(-ext, -ext, px + ext, px + ext);
+                l.draw(cv);
+            }
+            return new android.graphics.drawable.BitmapDrawable(a.getResources(), bmp);
+        }
+        return dr;
+    }
+
+    private int iconTaps;
+    private long lastIconTap;
+
+    /** 「新版本说明」里点「去换图标」：打开通用页并滚到应用图标。 */
+    void revealAppIcon() {
+        showPage(R.id.settings_page_general);
+        View title = settingsFragment.findViewById(R.id.tv_app_icon_title);
+        View scroll = settingsFragment.findViewById(R.id.settings_scroll);
+        if (title == null || scroll == null) return;
+        scroll.postDelayed(() -> {
+            int y = 0;
+            for (View v = title; v != null && v != scroll;
+                 v = v.getParent() instanceof View ? (View) v.getParent() : null) y += v.getTop();
+            scroll.scrollTo(0, Math.max(0, y - Math.round(80 * a.getResources().getDisplayMetrics().density)));
+        }, 260);
     }
 }

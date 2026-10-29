@@ -246,4 +246,17 @@ public final class Prefs {
     /** 遮罩强度 %，默认 35（见 data/WidgetLook）。 */
     public static int widgetMask(Context ctx) { return com.ecut.campus.data.WidgetLook.clampMask(sp(ctx).getInt("widget_mask", com.ecut.campus.data.WidgetLook.MASK_DEFAULT)); }
     public static void setWidgetMask(Context ctx, int p) { sp(ctx).edit().putInt("widget_mask", com.ecut.campus.data.WidgetLook.clampMask(p)).putLong("widget_bg_ver", System.currentTimeMillis()).commit(); }
+    // ===== 1.2.7 =====
+    /** 通知栏常驻「下一节课」，默认关。 */
+    public static boolean nextClassNotice(Context ctx) { return sp(ctx).getBoolean("next_class_notice", false); }
+    public static void setNextClassNotice(Context ctx, boolean v) { sp(ctx).edit().putBoolean("next_class_notice", v).apply(); }
+    /** 应用图标（data/AppIconOption.key），没选过 = 默认刻度梨。 */
+    public static String appIcon(Context ctx) { return sp(ctx).getString("app_icon", ""); }
+    public static void setAppIcon(Context ctx, String key) { sp(ctx).edit().putString("app_icon", key).apply(); }
+    /** 彩蛋图标「本本」是否已解锁 */
+    public static boolean benbenUnlocked(Context ctx) { return sp(ctx).getBoolean("icon_benben_unlocked", false); }
+    public static void setBenbenUnlocked(Context ctx) { sp(ctx).edit().putBoolean("icon_benben_unlocked", true).apply(); }
+    /** 上次打开时的 versionCode（「新版本说明」用），没记过为 0。 */
+    public static int lastSeenVersionCode(Context ctx) { return sp(ctx).getInt("last_seen_vc", 0); }
+    public static void setLastSeenVersionCode(Context ctx, int vc) { sp(ctx).edit().putInt("last_seen_vc", vc).apply(); }
 }

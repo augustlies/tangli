@@ -51,7 +51,9 @@ public class AboutActivity extends AppCompatActivity {
 
         Ui.label(this, col, "FEEDBACK · 问题反馈");
         LinearLayout c2 = Ui.card(this, col);
-        Ui.row(this, c2, "01", "发邮件反馈", Updater.FEEDBACK_EMAIL, "MAIL", v -> mail());
+        Ui.row(this, c2, "00", "一键发送错误日志", "直接传给开发者，拿一个报告码 · 不含学号姓名", "SEND",
+                v -> DiagLog.upload(this));
+        Ui.row(this, c2, "01", "发邮件反馈", Updater.FEEDBACK_EMAIL + " · 自动附诊断日志", "MAIL", v -> mail());
         Ui.row(this, c2, "02", "在 GitHub 提 Issue", "需要 GitHub 账号，方便追踪进度", "↗ WEB",
                 v -> Updater.open(this, Updater.ISSUES_URL));
         Ui.row(this, c2, "03", "复制邮箱地址", "邮件打不开时用", "COPY", v -> {
@@ -62,7 +64,7 @@ public class AboutActivity extends AppCompatActivity {
         Ui.row(this, c2, "04", "导出诊断日志", "课表不对、同步失败时导出，连同截图一起发来", "EXPORT",
                 v -> DiagLog.export(this));
         TextView tip = Ui.text(this, col,
-                "反馈时说清楚哪个页面、做了什么、看到了什么，最好附一张截图。邮件里会自动带上版本号和机型。",
+                "反馈时说清楚哪个页面、做了什么、看到了什么，最好附一张截图。发邮件反馈会自动带上版本号、机型和诊断日志（不含学号、姓名、Cookie），不想发可以在邮件里删掉附件。",
                 12f, G.MUTE);
         tip.setPadding(Ui.dp(this, 4), Ui.dp(this, 10), Ui.dp(this, 4), 0);
 
@@ -137,21 +139,66 @@ public class AboutActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * 发邮件反馈：自动附上诊断日志（和「导出诊断日志」同一份，DiagLog.buildReport，不含学号、姓名、Cookie）。
+     * 用 ACTION_SEND 带附件；没有能收附件的邮件应用就退回不带附件的 mailto，再不行复制邮箱。
+     */
     private void mail() {
         String subject = "[烫梨反馈] v" + BuildConfig.VERSION_NAME;
-        String body = "\n\n\n————\n版本：v" + BuildConfig.VERSION_NAME + " (" + BuildConfig.VERSION_CODE + ")"
+        String info = "版本：v" + BuildConfig.VERSION_NAME + " (" + BuildConfig.VERSION_CODE + ")"
                 + "\n机型：" + Build.MANUFACTURER + " " + Build.MODEL
                 + "\n系统：Android " + Build.VERSION.RELEASE + " (API " + Build.VERSION.SDK_INT + ")";
+        Uri log = null;
+        try {
+            String name = "tangli-diag-" + new java.text.SimpleDateFormat("MMdd-HHmm", java.util.Locale.US)
+                    .format(new java.util.Date()) + ".txt";
+            java.io.File out = ShareFiles.exportFile(this, name);
+            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(out)) {
+                fos.write(DiagLog.buildReport(this).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
+            log = androidx.core.content.FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", out);
+        } catch (Throwable ignored) {
+            // 日志生成失败就照常发不带附件的邮件
+        }
+        if (log != null) {
+            String body = "\n\n\n————\n" + ATTACH_NOTE + "\n" + info;
+            Intent send = new Intent(Intent.ACTION_SEND);
+            send.setType("message/rfc822");
+            send.putExtra(Intent.EXTRA_EMAIL, new String[]{Updater.FEEDBACK_EMAIL});
+            send.putExtra(Intent.EXTRA_SUBJECT, subject);
+            send.putExtra(Intent.EXTRA_TEXT, body);
+            send.putExtra(Intent.EXTRA_STREAM, log);
+            send.setClipData(ClipData.newRawUri("diag", log)); // 有的邮件应用只认 ClipData 上的授权
+            send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            if (send.resolveActivity(getPackageManager()) != null || hasAnySendTarget(send)) {
+                try {
+                    startActivity(Intent.createChooser(send, "选择邮件应用"));
+                    return;
+                } catch (Exception ignored) {
+                }
+            }
+        }
         Intent i = new Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:"));
         i.putExtra(Intent.EXTRA_EMAIL, new String[]{Updater.FEEDBACK_EMAIL});
         i.putExtra(Intent.EXTRA_SUBJECT, subject);
-        i.putExtra(Intent.EXTRA_TEXT, body);
+        i.putExtra(Intent.EXTRA_TEXT, "\n\n\n————\n" + info);
         try {
             startActivity(Intent.createChooser(i, "选择邮件应用"));
         } catch (Exception e) {
             Toast.makeText(this, "没有邮件应用，邮箱已复制", Toast.LENGTH_SHORT).show();
             ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
             cm.setPrimaryClip(ClipData.newPlainText("email", Updater.FEEDBACK_EMAIL));
+        }
+    }
+
+    static final String ATTACH_NOTE = "已自动附上诊断日志（不含学号、姓名、Cookie），不想发可以删掉。课表显示不对的话，最好再附一张截图。";
+
+    /** Android 11+ 包可见性限制下 resolveActivity 可能拿不到结果，再用 queryIntentActivities 试一次。 */
+    private boolean hasAnySendTarget(Intent send) {
+        try {
+            return !getPackageManager().queryIntentActivities(send, 0).isEmpty();
+        } catch (Exception e) {
+            return false;
         }
     }
 }

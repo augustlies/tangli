@@ -699,7 +699,27 @@
                     android:layout_width="match_parent"
                     android:layout_height="38dp"
                     android:layout_marginTop="12dp"
+                    android:layout_marginBottom="18dp"
                     android:orientation="horizontal" />
+
+                <TextView
+                    android:id="@+id/tv_app_icon_title"
+                    style="@style/G.RowTitle"
+                    android:text="应用图标" />
+
+                <!-- 两个选项（图标预览 + 名字），SettingsTab.renderAppIcon 里填 -->
+                <LinearLayout
+                    android:id="@+id/box_app_icon"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal" />
+
+                <TextView
+                    style="@style/G.RowSub"
+                    android:layout_width="match_parent"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/app_icon_hint" />
 
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -923,6 +943,37 @@
 
                     <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/switch_class_remind"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/row_next_class_notice"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/G.RowTitle"
+                            android:text="通知栏显示下一节课" />
+
+                        <TextView
+                            android:id="@+id/tv_next_class_notice_sub"
+                            style="@style/G.RowSub"
+                            android:text="一条静音的常驻通知：课名、时间、教室" />
+                    </LinearLayout>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switch_next_class_notice"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content" />
                 </LinearLayout>

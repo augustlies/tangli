@@ -79,7 +79,8 @@ final class TimetableFiles {
                     Toast.LENGTH_SHORT).show();
             return true;
         } catch (Exception e) {
-            Toast.makeText(a, "导入失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
+            DiagLog.error(a, "import", "课表文件导入失败", e);
+            DiagLog.failDialog(a, "课表文件没导进来", "原因：" + e.getMessage());
             return false;
         }
     }

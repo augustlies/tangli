@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 彩蛋图标「本本」（3D 安全帽女孩，帽徽已去掉；前景整张铺满）。设置→应用图标里连点当前选中的卡片 5 次解锁 -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_benben_foreground" />
+</adaptive-icon>

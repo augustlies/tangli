@@ -17,6 +17,11 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.HOME" />
         </intent>
+        <!-- 发邮件反馈（带诊断日志附件）前先看有没有邮件应用 -->
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="message/rfc822" />
+        </intent>
     </queries>
 
     <application
@@ -35,10 +40,7 @@
             android:exported="true"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:launchMode="singleTop">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
+            <!-- 桌面图标入口在下面两个 activity-alias 上（1.2.7 起可换图标），这里不再挂 LAUNCHER -->
             <!-- tangli://cmd?t=烫梨指令：点链接直接打开预览（仍需确认） -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -46,11 +48,57 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="tangli" />
             </intent-filter>
-            <!-- 长按图标：「添加今日课程组件」 -->
+        </activity>
+
+        <!-- 桌面图标：同一时间只启用一个（AppIcon 用 PackageManager 切换，DONT_KILL_APP）。
+             默认「刻度梨」；「大肥鱼」和彩蛋「本本」默认关。长按图标的快捷方式两边都要挂。 -->
+        <activity-alias
+            android:name=".LauncherPear"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:roundIcon="@mipmap/ic_launcher_round"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
-        </activity>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".LauncherArt"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_art"
+            android:roundIcon="@mipmap/ic_launcher_art_round"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+
+        <activity-alias
+            android:name=".LauncherBenben"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_benben"
+            android:roundIcon="@mipmap/ic_launcher_benben_round"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
 
         <!-- 添加桌面组件的小卡片（半透明）：前台请桌面放置，等回调；没弹窗就给权限入口和手动步骤。由快捷方式（桌面启动）打开，所以 exported -->
         <activity
@@ -218,6 +266,19 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.TIME_SET" />
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 通知栏常驻「下一节课」（默认关）：上下课时刻的闹钟 + 开机/改时间/升级后重排 -->
+        <receiver
+            android:name=".NextClassNotice$Receiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>

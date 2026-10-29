@@ -375,6 +375,97 @@ public final class DiagLog {
         }
     }
 
+    /**
+     * 出错时的统一弹窗：写明原因，带「发给开发者」（一键上传）和「导出文件」两个按钮。
+     * 用在导入失败、同步失败这类用户自己解决不了、需要发给开发者看的地方。
+     */
+    public static void failDialog(Activity a, String title, String message) {
+        if (a == null || a.isFinishing()) return;
+        log(a, "fail", title + ": " + message);
+        new androidx.appcompat.app.AlertDialog.Builder(a)
+                .setTitle(title)
+                .setMessage(message + "\n\n弄不好的话，点「发给开发者」一键上传错误日志（不含账号密码，姓名学号已去掉）。")
+                .setNegativeButton("知道了", null)
+                .setNeutralButton("导出文件", (d, w) -> export(a))
+                .setPositiveButton("发给开发者", (d, w) -> upload(a))
+                .show();
+    }
+
+    /** 上传地址：官网的 /api/report，转发到开发者的 Telegram。 */
+    static final String REPORT_URL = "https://tangli.sueexin.dev/api/report";
+
+    /**
+     * 一键把诊断日志发给开发者：后台上传，成功后弹出报告码（让用户发帖/私信时报上），
+     * 失败就退回到系统分享，让用户自己发。
+     */
+    public static void upload(Activity a) {
+        if (a == null) return;
+        final String report;
+        try {
+            report = buildReport(a);
+        } catch (Throwable e) {
+            export(a);
+            return;
+        }
+        Toast.makeText(a, "正在发送错误日志…", Toast.LENGTH_SHORT).show();
+        final android.content.Context app = a.getApplicationContext();
+        new Thread(() -> {
+            String id = null, err = null;
+            java.net.HttpURLConnection c = null;
+            try {
+                byte[] body = report.getBytes(StandardCharsets.UTF_8);
+                c = (java.net.HttpURLConnection) new java.net.URL(REPORT_URL).openConnection();
+                c.setConnectTimeout(10000);
+                c.setReadTimeout(20000);
+                c.setRequestMethod("POST");
+                c.setDoOutput(true);
+                c.setFixedLengthStreamingMode(body.length);
+                c.setRequestProperty("Content-Type", "text/plain; charset=utf-8");
+                c.setRequestProperty("X-Tangli-Version", BuildConfig.VERSION_NAME + " (" + BuildConfig.VERSION_CODE + ")");
+                try (java.io.OutputStream os = c.getOutputStream()) { os.write(body); }
+                int code = c.getResponseCode();
+                java.io.InputStream is = code < 400 ? c.getInputStream() : c.getErrorStream();
+                String text = is == null ? "" : new String(readAll(is), StandardCharsets.UTF_8);
+                JSONObject o = text.isEmpty() ? new JSONObject() : new JSONObject(text);
+                if (code == 200 && o.optBoolean("ok")) id = o.optString("id", "");
+                else err = code == 429 ? "发得太频繁了，过一会儿再试" : "服务器没收下（" + code + "）";
+            } catch (Throwable e) {
+                err = "网络不通";
+            } finally {
+                if (c != null) c.disconnect();
+            }
+            final String fid = id, ferr = err;
+            log(app, "fail", fid != null ? "日志已上传 #" + fid : "日志上传失败: " + ferr);
+            a.runOnUiThread(() -> {
+                if (a.isFinishing()) return;
+                if (fid != null) {
+                    new androidx.appcompat.app.AlertDialog.Builder(a)
+                            .setTitle("已发给开发者")
+                            .setMessage("报告码 #" + fid + "\n\n反馈时报上这个码，开发者就能对上你的日志。")
+                            .setPositiveButton("复制报告码", (d, w) -> {
+                                android.content.ClipboardManager cm = (android.content.ClipboardManager)
+                                        a.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                                cm.setPrimaryClip(android.content.ClipData.newPlainText("tangli", "烫梨报告码 #" + fid));
+                                Toast.makeText(a, "已复制", Toast.LENGTH_SHORT).show();
+                            })
+                            .setNegativeButton("好", null)
+                            .show();
+                } else {
+                    Toast.makeText(a, "没发出去：" + ferr + "，改用分享发送", Toast.LENGTH_LONG).show();
+                    export(a);
+                }
+            });
+        }, "diag-upload").start();
+    }
+
+    private static byte[] readAll(java.io.InputStream is) throws java.io.IOException {
+        java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+        byte[] buf = new byte[4096];
+        int n;
+        while ((n = is.read(buf)) > 0) bos.write(buf, 0, n);
+        return bos.toByteArray();
+    }
+
     /** 写成 txt 并弹出系统分享（微信 / QQ / 邮件都行）。 */
     public static void export(Activity a) {
         try {

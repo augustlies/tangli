@@ -108,6 +108,8 @@ public final class ClassWidget extends AppWidgetProvider {
 
     /** 课表、作息、主题、背景变了也调一下；没放时什么都不做。 */
     public static void updateAll(Context c) {
+        // 课表/作息/开学日变了的地方都会调这里：通知栏常驻「下一节课」（开着的话）一起刷新
+        NextClassNotice.update(c);
         AppWidgetManager m = AppWidgetManager.getInstance(c);
         if (m == null) return;
         int[] a = ids(c, m, ClassWidget.class);
