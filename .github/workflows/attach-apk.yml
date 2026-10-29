@@ -1,0 +1,33 @@
+name: Attach APK to release
+
+# 维护者用：把已签名的 APK（从官网等地址下载，校验 SHA-256）挂到指定 Release 上
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag (e.g. v1.2.7)
+        required: true
+      url:
+        description: APK download URL
+        required: true
+      sha256:
+        description: Expected SHA-256
+        required: true
+      name:
+        description: Asset file name (e.g. tangli-v1.2.7.apk)
+        required: true
+
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download and verify
+        run: |
+          curl -fsSL -o "${{ inputs.name }}" "${{ inputs.url }}"
+          echo "${{ inputs.sha256 }}  ${{ inputs.name }}" | sha256sum -c -
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ inputs.tag }}" "${{ inputs.name }}" --clobber -R "${{ github.repository }}"
