@@ -24,6 +24,58 @@ public final class ClassWidgetService extends RemoteViewsService {
         return new Factory(getApplicationContext(), intent.getData());
     }
 
+    /** 一条课程条。Android 12+ 直接塞进小组件（不经过本服务），老系统由下面的 Factory 调用。 */
+    static RemoteViews item(Context c, WidgetDay.Chip ch, int theme, int chipAlpha, long builtAt, int nowMin) {
+        RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget_class_item);
+        int idx = Math.abs(ch.colorIndex) % ClassWidget.CHIP.length;
+        v.setTextViewText(R.id.wi_name, ch.name);
+        v.setTextViewText(R.id.wi_line, ch.line);
+        v.setViewVisibility(R.id.wi_line, ch.line.isEmpty() ? View.GONE : View.VISIBLE);
+        countdown(v, ch, builtAt, nowMin);
+        v.setTextViewText(R.id.wi_tag, ch.tag);
+        v.setViewVisibility(R.id.wi_tag, ch.tag.isEmpty() ? View.GONE : View.VISIBLE);
+        if (theme == ClassWidget.THEME_SYSTEM) {
+            v.setImageViewResource(R.id.wi_bg, ClassWidget.CHIP[idx]);
+        } else {
+            Context tc = ClassWidget.themed(c, theme);
+            v.setImageViewResource(R.id.wi_bg, R.drawable.w_chip_shape);
+            v.setInt(R.id.wi_bg, "setColorFilter", ContextCompat.getColor(tc, ClassWidget.PIG[idx]));
+            v.setTextColor(R.id.wi_name, ContextCompat.getColor(tc, R.color.w_ink));
+            v.setTextColor(R.id.wi_line, ContextCompat.getColor(tc, R.color.w_chip_sub));
+            v.setTextColor(R.id.wi_tag, ContextCompat.getColor(tc, R.color.w_accent));
+            v.setTextColor(R.id.wi_cd_live, ContextCompat.getColor(tc, R.color.w_accent));
+            v.setTextColor(R.id.wi_cd_soon, ContextCompat.getColor(tc, R.color.w_chip_sub));
+        }
+        if (chipAlpha < 255) v.setInt(R.id.wi_bg, "setImageAlpha", chipAlpha);
+        v.setOnClickFillInIntent(R.id.wi_root, new Intent());
+        return v;
+    }
+
+    /**
+     * 倒计时：Chronometer 倒着走（API 24+），基准 = 开机时钟 + 离下课/上课还有多久。到点后由小组件的边界闹钟翻页。
+     * 进行中「还剩 mm:ss」（超过 1 小时是 h:mm:ss）朱砂色；下一门 60 分钟内「mm:ss 后上课」。没有倒计时两个都藏起来。
+     */
+    private static void countdown(RemoteViews v, WidgetDay.Chip ch, long builtAt, int nowMin) {
+        v.setViewVisibility(R.id.wi_cd_live, View.GONE);
+        v.setViewVisibility(R.id.wi_cd_soon, View.GONE);
+        v.setChronometer(R.id.wi_cd_live, SystemClock.elapsedRealtime(), null, false);
+        v.setChronometer(R.id.wi_cd_soon, SystemClock.elapsedRealtime(), null, false);
+        if (ch.cdKind == WidgetDay.Chip.CD_NONE || ch.cdMin < 0) return;
+        if (Build.VERSION.SDK_INT < 24) { // 不会走秒：写成静态「还剩 34 分钟」接在时间后面
+            String t = WidgetDay.countdownText(ch.cdKind, ch.cdMin, nowMin);
+            v.setTextViewText(R.id.wi_line, ch.line.isEmpty() ? t : ch.line + "  " + t);
+            v.setViewVisibility(R.id.wi_line, View.VISIBLE);
+            return;
+        }
+        boolean live = ch.cdKind == WidgetDay.Chip.CD_LEFT;
+        int id = live ? R.id.wi_cd_live : R.id.wi_cd_soon;
+        long target = ClassPlans.at(ClassPlans.midnight(builtAt), ch.cdMin);
+        long base = SystemClock.elapsedRealtime() + Math.max(0L, target - System.currentTimeMillis());
+        v.setChronometer(id, base, live ? "还剩 %s" : "%s 后上课", true);
+        v.setChronometerCountDown(id, true);
+        v.setViewVisibility(id, View.VISIBLE);
+    }
+
     private static final class Factory implements RemoteViewsFactory {
         private final Context c;
         private final int cap, level, theme, chipAlpha;
@@ -67,56 +119,8 @@ public final class ClassWidgetService extends RemoteViewsService {
 
         @Override
         public RemoteViews getViewAt(int position) {
-            RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget_class_item);
-            if (position < 0 || position >= chips.size()) return v;
-            WidgetDay.Chip ch = chips.get(position);
-            int idx = Math.abs(ch.colorIndex) % ClassWidget.CHIP.length;
-            v.setTextViewText(R.id.wi_name, ch.name);
-            v.setTextViewText(R.id.wi_line, ch.line);
-            v.setViewVisibility(R.id.wi_line, ch.line.isEmpty() ? View.GONE : View.VISIBLE);
-            countdown(v, ch);
-            v.setTextViewText(R.id.wi_tag, ch.tag);
-            v.setViewVisibility(R.id.wi_tag, ch.tag.isEmpty() ? View.GONE : View.VISIBLE);
-            if (theme == ClassWidget.THEME_SYSTEM) {
-                v.setImageViewResource(R.id.wi_bg, ClassWidget.CHIP[idx]);
-            } else {
-                Context tc = ClassWidget.themed(c, theme);
-                v.setImageViewResource(R.id.wi_bg, R.drawable.w_chip_shape);
-                v.setInt(R.id.wi_bg, "setColorFilter", ContextCompat.getColor(tc, ClassWidget.PIG[idx]));
-                v.setTextColor(R.id.wi_name, ContextCompat.getColor(tc, R.color.w_ink));
-                v.setTextColor(R.id.wi_line, ContextCompat.getColor(tc, R.color.w_chip_sub));
-                v.setTextColor(R.id.wi_tag, ContextCompat.getColor(tc, R.color.w_accent));
-                v.setTextColor(R.id.wi_cd_live, ContextCompat.getColor(tc, R.color.w_accent));
-                v.setTextColor(R.id.wi_cd_soon, ContextCompat.getColor(tc, R.color.w_chip_sub));
-            }
-            if (chipAlpha < 255) v.setInt(R.id.wi_bg, "setImageAlpha", chipAlpha);
-            v.setOnClickFillInIntent(R.id.wi_root, new Intent());
-            return v;
-        }
-
-        /**
-         * 倒计时：Chronometer 倒着走（API 24+），基准 = 开机时钟 + 离下课/上课还有多久。到点后由小组件的边界闹钟翻页。
-         * 进行中「还剩 mm:ss」（超过 1 小时是 h:mm:ss）朱砂色；下一门 60 分钟内「mm:ss 后上课」。没有倒计时两个都藏起来。
-         */
-        private void countdown(RemoteViews v, WidgetDay.Chip ch) {
-            v.setViewVisibility(R.id.wi_cd_live, View.GONE);
-            v.setViewVisibility(R.id.wi_cd_soon, View.GONE);
-            v.setChronometer(R.id.wi_cd_live, SystemClock.elapsedRealtime(), null, false);
-            v.setChronometer(R.id.wi_cd_soon, SystemClock.elapsedRealtime(), null, false);
-            if (ch.cdKind == WidgetDay.Chip.CD_NONE || ch.cdMin < 0) return;
-            if (Build.VERSION.SDK_INT < 24) { // 不会走秒：写成静态「还剩 34 分钟」接在时间后面
-                String t = WidgetDay.countdownText(ch.cdKind, ch.cdMin, nowMin);
-                v.setTextViewText(R.id.wi_line, ch.line.isEmpty() ? t : ch.line + "  " + t);
-                v.setViewVisibility(R.id.wi_line, View.VISIBLE);
-                return;
-            }
-            boolean live = ch.cdKind == WidgetDay.Chip.CD_LEFT;
-            int id = live ? R.id.wi_cd_live : R.id.wi_cd_soon;
-            long target = ClassPlans.at(ClassPlans.midnight(builtAt), ch.cdMin);
-            long base = SystemClock.elapsedRealtime() + Math.max(0L, target - System.currentTimeMillis());
-            v.setChronometer(id, base, live ? "还剩 %s" : "%s 后上课", true);
-            v.setChronometerCountDown(id, true);
-            v.setViewVisibility(id, View.VISIBLE);
+            if (position < 0 || position >= chips.size()) return new RemoteViews(c.getPackageName(), R.layout.widget_class_item);
+            return item(c, chips.get(position), theme, chipAlpha, builtAt, nowMin);
         }
 
         @Override public RemoteViews getLoadingView() { return null; }

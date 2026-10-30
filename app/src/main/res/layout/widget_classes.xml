@@ -15,6 +15,7 @@
         android:src="@drawable/w_card" />
 
     <LinearLayout
+        android:id="@+id/w_content"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
@@ -65,7 +66,7 @@
             <ListView
                 android:id="@+id/w_list"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_height="wrap_content"
                 android:divider="@android:color/transparent"
                 android:dividerHeight="5dp"
                 android:listSelector="@android:color/transparent"

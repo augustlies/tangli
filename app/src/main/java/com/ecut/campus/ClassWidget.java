@@ -319,10 +319,28 @@ public final class ClassWidget extends AppWidgetProvider {
         Intent svc = new Intent(c, ClassWidgetService.class)
                 .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
                 .setData(Uri.parse("tangli-widget://classes/" + id + "?cap=" + cap + "&w=" + level + "&theme=" + itemTheme
+                        + "&v=" + BuildConfig.VERSION_CODE // 升级后换一份新列表，免得桌面用着旧连接
                         + (look != null ? "&bg=" + Prefs.widgetBgVer(c) + "&ca=" + ca : "")));
-        v.setRemoteAdapter(R.id.w_list, svc);
+        if (Build.VERSION.SDK_INT >= 31) {
+            // Android 12+：课程条直接装进小组件，不再让桌面去连列表服务。
+            // 有的桌面（如 vivo OriginOS）升级或进程被杀后连不上服务，只剩标题、下面一片空白。
+            long builtAt = System.currentTimeMillis();
+            int nowMin = ClassPlans.nowMinutes(builtAt);
+            RemoteViews.RemoteCollectionItems.Builder b = new RemoteViews.RemoteCollectionItems.Builder()
+                    .setHasStableIds(false).setViewTypeCount(1);
+            for (int i = 0; i < card.chips.size(); i++) {
+                b.addItem(i, ClassWidgetService.item(c, card.chips.get(i), itemTheme, ca, builtAt, nowMin));
+            }
+            v.setRemoteAdapter(R.id.w_list, b.build());
+        } else {
+            v.setRemoteAdapter(R.id.w_list, svc);
+        }
         v.setPendingIntentTemplate(R.id.w_list, openTimetable(c, 73, true));
-        v.setOnClickPendingIntent(android.R.id.background, openTimetable(c, 72, false));
+        // 整张卡都能点：有的桌面（vivo 等）只认子视图上的点击，根布局上的不灵；列表只包住课程条，下面的空白交给卡片
+        PendingIntent open = openTimetable(c, 72, false);
+        v.setOnClickPendingIntent(android.R.id.background, open);
+        v.setOnClickPendingIntent(R.id.w_content, open);
+        v.setOnClickPendingIntent(R.id.w_bg, open);
         return v;
     }
 
