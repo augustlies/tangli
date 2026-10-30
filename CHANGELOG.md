@@ -2,7 +2,7 @@
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [1.2.8] - 2026-10-30
+## [1.2.8] - 未发布
 
 ### 修复
 - 桌面小组件在部分手机（如 vivo）上只显示「还有 N 门」、下面的课程条一片空白：Android 12 及以上改成把课程条直接装进小组件，不再依赖桌面去连列表服务

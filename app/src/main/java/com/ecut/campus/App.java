@@ -22,6 +22,7 @@ public class App extends Application {
             }
             try {
                 GradeCheckWorker.schedule(this);
+                if (ClassWidget.placedCount(this) > 0) WidgetRefreshWorker.schedule(this);
             } catch (Throwable ignored) {
             }
             // 规则 10 万+ 条，提前在后台解析，避免拦截服务启动时卡主线程

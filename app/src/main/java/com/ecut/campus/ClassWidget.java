@@ -67,6 +67,12 @@ public final class ClassWidget extends AppWidgetProvider {
     public void onUpdate(Context c, AppWidgetManager m, int[] ids) {
         render(c, m, ids);
         scheduleTick(c);
+        WidgetRefreshWorker.schedule(c);
+    }
+
+    @Override
+    public void onEnabled(Context c) {
+        WidgetRefreshWorker.schedule(c);
     }
 
     @Override
@@ -89,6 +95,7 @@ public final class ClassWidget extends AppWidgetProvider {
     @Override
     public void onDisabled(Context c) {
         cancelTickIfIdle(c);
+        WidgetRefreshWorker.cancel(c);
     }
 
     static int[] ids(Context c, AppWidgetManager m, Class<?> provider) {
@@ -123,10 +130,11 @@ public final class ClassWidget extends AppWidgetProvider {
         try {
             long now = System.currentTimeMillis();
             AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
-            if (am != null) am.setWindow(AlarmManager.RTC, Math.max(now + 30_000L, nextRefresh(c, now) + 2_000L),
+            // RTC_WAKEUP：息屏时也按点翻页，免得亮屏那一刻还停在上一节（一天就几次，不费电）
+            if (am != null) am.setWindow(AlarmManager.RTC_WAKEUP, Math.max(now + 30_000L, nextRefresh(c, now) + 2_000L),
                     60_000L, tick(c));
         } catch (Throwable ignored) {
-            // 排不上闹钟不影响这次显示；系统每 30 分钟还会兜底刷新
+            // 排不上闹钟不影响这次显示；WidgetRefreshWorker 每 15 分钟还会兜底刷新
         }
     }
 
