@@ -1,6 +1,7 @@
 # AGENTS.md — 给 AI Agent 的项目说明
 
 > 本项目由单人开发、自用。**所有 Agent 动手前必须先读 `docs/HANDOFF.md`。**
+> **改任何界面（布局、颜色、字体、动效）前先读根目录 `DESIGN.md`**，按「刻度 Gauge / 纸墨」规范来。
 
 ## 铁律
 
