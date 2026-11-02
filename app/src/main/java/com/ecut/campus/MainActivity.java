@@ -105,8 +105,13 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
         AppIcon.sync(getApplicationContext());
         // 从老版本升上来的第一次打开：先弹「新版本说明」，这次就不再弹检查更新，免得两个弹窗叠在一起
         boolean whatsNew = maybeShowWhatsNew(container);
+        // 桌面放了小组件、但烫梨还没被允许后台运行：主动提示一次（不和「新版本说明」叠着弹）
+        boolean bgGuide = !whatsNew && BgAllow.shouldAutoShow(this);
+        if (bgGuide) container.postDelayed(() -> {
+            if (!isFinishing()) BgAllow.autoShow(this);
+        }, 900);
         // 首帧画完再去查更新（联网 + 可能弹窗），不挡冷启动
-        if (!whatsNew) container.postDelayed(() -> {
+        if (!whatsNew && !bgGuide) container.postDelayed(() -> {
             if (!isFinishing()) Updater.autoCheck(this);
         }, 1500);
         // 从 tangli:// 链接冷启动

@@ -49,6 +49,7 @@ public class WidgetRefreshWorker extends Worker {
             return Result.success();
         }
         try {
+            Prefs.markWidgetBgRefresh(c);
             ClassWidget.updateAll(c);
         } catch (Throwable ignored) {
         }

@@ -213,6 +213,17 @@ public final class DiagLog {
             if (pm != null && Build.VERSION.SDK_INT >= 23) {
                 x.append("忽略电池优化: ").append(yn(pm.isIgnoringBatteryOptimizations(ctx.getPackageName()))).append('\n');
             }
+            x.append("桌面小组件: ").append(ClassWidget.placedCount(ctx)).append(" 个 · 上次后台自己刷新: ")
+                    .append(Prefs.widgetBgRefreshAt(ctx) > 0 ? ts(Prefs.widgetBgRefreshAt(ctx)) : "从没有").append('\n');
+            if (Build.VERSION.SDK_INT >= 31) {
+                android.app.AlarmManager am = (android.app.AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
+                x.append("精确闹钟: ").append(yn(am != null && am.canScheduleExactAlarms())).append('\n');
+            }
+            if (Build.VERSION.SDK_INT >= 28) {
+                android.app.usage.UsageStatsManager us = (android.app.usage.UsageStatsManager)
+                        ctx.getSystemService(Context.USAGE_STATS_SERVICE);
+                if (us != null) x.append("待机分组: ").append(us.getAppStandbyBucket()).append('\n');
+            }
         });
 
         section(sb, "学校", x -> {

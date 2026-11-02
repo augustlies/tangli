@@ -137,7 +137,7 @@ public final class NextClassNotice {
             if (b >= 0) next = Math.min(next, ClassPlans.at(today, b));
         } catch (Exception ignored) {
         }
-        am.setWindow(AlarmManager.RTC_WAKEUP, Math.max(now + 30_000L, next + 2_000L), 60_000L, tick(c));
+        Wake.at(c, Math.max(now + 30_000L, next + 2_000L), tick(c));
     }
 
     private static PendingIntent tick(Context c) {
@@ -151,6 +151,7 @@ public final class NextClassNotice {
         @Override
         public void onReceive(Context c, Intent intent) {
             // 顺带刷新桌面小组件（updateAll 里会先刷通知）：两边互为备份，开机 / 改时间 / 跨天 / 升级后小组件也跟着翻页
+            if (ClassWidget.placedCount(c) > 0) Prefs.markWidgetBgRefresh(c);
             ClassWidget.updateAll(c);
             if (ClassWidget.placedCount(c) > 0) WidgetRefreshWorker.schedule(c);
         }

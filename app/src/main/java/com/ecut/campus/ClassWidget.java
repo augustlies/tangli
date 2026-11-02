@@ -65,6 +65,7 @@ public final class ClassWidget extends AppWidgetProvider {
 
     @Override
     public void onUpdate(Context c, AppWidgetManager m, int[] ids) {
+        Prefs.markWidgetBgRefresh(c);
         render(c, m, ids);
         scheduleTick(c);
         WidgetRefreshWorker.schedule(c);
@@ -83,7 +84,10 @@ public final class ClassWidget extends AppWidgetProvider {
     @Override
     public void onReceive(Context c, Intent intent) {
         super.onReceive(c, intent);
-        if (ACTION_TICK.equals(intent.getAction())) updateAll(c);
+        if (ACTION_TICK.equals(intent.getAction())) {
+            Prefs.markWidgetBgRefresh(c);
+            updateAll(c);
+        }
         else if (ACTION_PINNED.equals(intent.getAction())) {
             // 添加卡片还开着就由它显示「已添加」，否则弹个 toast
             if (!PinWidgetActivity.onPinned())
@@ -129,10 +133,8 @@ public final class ClassWidget extends AppWidgetProvider {
     static void scheduleTick(Context c) {
         try {
             long now = System.currentTimeMillis();
-            AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
-            // RTC_WAKEUP：息屏时也按点翻页，免得亮屏那一刻还停在上一节（一天就几次，不费电）
-            if (am != null) am.setWindow(AlarmManager.RTC_WAKEUP, Math.max(now + 30_000L, nextRefresh(c, now) + 2_000L),
-                    60_000L, tick(c));
+            // 休眠（Doze）中也按点翻页，免得课上完了还停在上一节（一天就几次，不费电）
+            Wake.at(c, Math.max(now + 30_000L, nextRefresh(c, now) + 2_000L), tick(c));
         } catch (Throwable ignored) {
             // 排不上闹钟不影响这次显示；WidgetRefreshWorker 每 15 分钟还会兜底刷新
         }

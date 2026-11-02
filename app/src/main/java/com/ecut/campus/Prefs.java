@@ -259,4 +259,10 @@ public final class Prefs {
     /** 上次打开时的 versionCode（「新版本说明」用），没记过为 0。 */
     public static int lastSeenVersionCode(Context ctx) { return sp(ctx).getInt("last_seen_vc", 0); }
     public static void setLastSeenVersionCode(Context ctx, int vc) { sp(ctx).edit().putInt("last_seen_vc", vc).apply(); }
+    /** 小组件上次「不靠打开 App」自己刷新的时间（闹钟 / 兜底 / 系统），诊断日志用。 */
+    public static long widgetBgRefreshAt(Context ctx) { return sp(ctx).getLong("widget_bg_refresh_at", 0L); }
+    public static void markWidgetBgRefresh(Context ctx) { sp(ctx).edit().putLong("widget_bg_refresh_at", System.currentTimeMillis()).apply(); }
+    /** 「允许后台刷新」引导是否已经主动弹过（只主动弹一次，设置里随时能再点）。 */
+    public static boolean bgGuideShown(Context ctx) { return sp(ctx).getBoolean("bg_guide_shown", false); }
+    public static void setBgGuideShown(Context ctx) { sp(ctx).edit().putBoolean("bg_guide_shown", true).apply(); }
 }

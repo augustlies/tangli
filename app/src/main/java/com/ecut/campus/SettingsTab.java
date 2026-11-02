@@ -417,6 +417,8 @@ final class SettingsTab {
     private void bindWidget() {
         View pin = settingsFragment.findViewById(R.id.row_widget_pin);
         if (pin != null) pin.setOnClickListener(v -> PinWidgetActivity.choose(a));
+        View allow = settingsFragment.findViewById(R.id.row_widget_bg_allow);
+        if (allow != null) allow.setOnClickListener(v -> BgAllow.show(a));
         View reset = settingsFragment.findViewById(R.id.btn_widget_bg_reset);
         if (reset != null) reset.setOnClickListener(v -> {
             WidgetBg.clear(a, true);
@@ -482,6 +484,8 @@ final class SettingsTab {
             pinSub.setText(n > 0 ? "已放了 " + n + " 个 · 今日课程，4×2 或拉成 2×2"
                     : "今日课程，4×2 或拉成 2×2，放到桌面一眼就知道");
         }
+        TextView allowSub = settingsFragment.findViewById(R.id.tv_widget_bg_allow_sub);
+        if (allowSub != null) allowSub.setText(BgAllow.status(a));
     }
 
     /** 选完图片回来：后台复制缩小，好了刷新小组件和这一栏。 */

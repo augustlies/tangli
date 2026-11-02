@@ -770,6 +770,35 @@
             <View style="@style/G.Hair" />
 
             <LinearLayout
+                android:id="@+id/row_widget_bg_allow"
+                style="@style/G.Row">
+
+                <TextView
+                    style="@style/G.RowIndex"
+                    android:text="02" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        style="@style/G.RowTitle"
+                        android:text="让小组件自己翻页" />
+
+                    <TextView
+                        android:id="@+id/tv_widget_bg_allow_sub"
+                        style="@style/G.RowSub"
+                        android:text="允许后台运行，上完课不用打开烫梨也会刷新" />
+                </LinearLayout>
+
+                <TextView style="@style/G.RowChevron" />
+            </LinearLayout>
+
+            <View style="@style/G.Hair" />
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
@@ -786,7 +815,7 @@
                     <TextView
                         style="@style/G.RowIndex"
                         android:layout_marginTop="3dp"
-                        android:text="02" />
+                        android:text="03" />
 
                     <LinearLayout
                         android:layout_width="0dp"
