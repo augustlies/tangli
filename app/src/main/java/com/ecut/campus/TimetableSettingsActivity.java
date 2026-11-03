@@ -82,6 +82,24 @@ public class TimetableSettingsActivity extends AppCompatActivity {
                 android.view.ViewGroup row = (android.view.ViewGroup) v;
                 ((android.widget.TextView) row.getChildAt(row.getChildCount() - 1)).setText(on ? "ON" : "OFF");
             });
+            android.view.View rain = Ui.row(this, disp, "02", "课块下雨提示",
+                    "上课时间段可能下雨时，课程卡片泛起雨雾提醒带伞",
+                    Prefs.rainHint(this) ? "ON" : "OFF", null);
+            rain.setBackgroundResource(Ui.selectable(this, false));
+            rain.setOnClickListener(v -> {
+                boolean on = !Prefs.rainHint(this);
+                Prefs.setRainHint(this, on);
+                android.view.ViewGroup row = (android.view.ViewGroup) v;
+                ((android.widget.TextView) row.getChildAt(row.getChildCount() - 1)).setText(on ? "ON" : "OFF");
+                if (on) {
+                    if (!RainWeather.hasPermission(this)) {
+                        RainWeather.askPermissionFromSetting(this);
+                    } else {
+                        RainWeather.refreshIfNeeded(this, false, null);
+                    }
+                }
+                ClassWidget.updateAll(getApplicationContext());
+            });
 
             Ui.label(this, body, "MORE · 更多");
             android.widget.LinearLayout card = Ui.card(this, body);
@@ -172,6 +190,14 @@ public class TimetableSettingsActivity extends AppCompatActivity {
         Toast.makeText(this, "课表设置已保存", Toast.LENGTH_SHORT).show();
         setResult(RESULT_OK);
         finish();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == RainWeather.REQ_LOCATION && RainWeather.hasPermission(this)) {
+            RainWeather.refreshIfNeeded(this, true, null);
+        }
     }
 
     private int dp(int v) {

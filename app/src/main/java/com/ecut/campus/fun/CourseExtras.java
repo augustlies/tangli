@@ -17,9 +17,14 @@ import android.widget.TextView;
 
 import com.ecut.campus.G;
 import com.ecut.campus.Prefs;
+import com.ecut.campus.RainWeather;
+import com.ecut.campus.Schools;
 import com.ecut.campus.Ui;
+import com.ecut.campus.WeekMath;
 import com.ecut.campus.data.AbsenceBook;
 import com.ecut.campus.data.ClassPrice;
+import com.ecut.campus.data.Dates;
+import com.ecut.campus.data.RainForecast;
 import com.ecut.campus.data.Timetable;
 
 /**
@@ -32,27 +37,38 @@ public final class CourseExtras {
     private final Timetable t;
     private final Timetable.Course course;
     private final int totalWeeks;
+    private final int viewedWeek;
     private AbsenceBook book;
     private TextView[] values;
     private View barFill;
     private TextView caption;
 
-    private CourseExtras(Activity a, Timetable t, Timetable.Course course) {
+    private CourseExtras(Activity a, Timetable t, Timetable.Course course, int viewedWeek) {
         this.a = a;
         this.t = t;
         this.course = course;
         this.totalWeeks = Prefs.totalWeeks(a);
+        this.viewedWeek = Math.max(1, viewedWeek);
     }
 
     /** 往 host 里填内容并显示；course 为空（新建课程）时保持隐藏。 */
     public static void attach(Activity a, LinearLayout host, Timetable t, Timetable.Course course,
                               int sessionIndex) {
+        int w = Prefs.hasCurrentWeek(a) ? Prefs.currentWeek(a) : 1;
+        attach(a, host, t, course, sessionIndex, w);
+    }
+
+    /** 往 host 里填内容并显示；course 为空（新建课程）时保持隐藏。 */
+    public static void attach(Activity a, LinearLayout host, Timetable t, Timetable.Course course,
+                              int sessionIndex, int viewedWeek) {
         if (host == null || course == null || t == null) return;
         host.removeAllViews();
-        CourseExtras x = new CourseExtras(a, t, course);
+        CourseExtras x = new CourseExtras(a, t, course, viewedWeek);
         Timetable.Session s = sessionIndex >= 0 && sessionIndex < course.sessions.size()
                 ? course.sessions.get(sessionIndex)
                 : (course.sessions.isEmpty() ? null : course.sessions.get(0));
+        View rain = x.rainBlock(s);
+        if (rain != null) host.addView(rain, block(a));
         View price = x.priceBlock(s);
         if (price != null) host.addView(price, block(a));
         host.addView(x.absenceBlock(), block(a));
@@ -86,6 +102,48 @@ public final class CourseExtras {
         tv.setTextSize(size);
         tv.setTextColor(color);
         return tv;
+    }
+
+    // ------------------------------------------------------------ 下雨提醒
+
+    private View rainBlock(Timetable.Session s) {
+        if (s == null || !s.isActive(viewedWeek)) return null;
+        String semId = t.semester != null ? t.semester.id : "";
+        String start = WeekMath.effectiveStart(
+                Prefs.semesterStartDate(a), semId, Schools.current(a).isEcut());
+        if (start == null || start.isEmpty()) return null;
+        String ymd = Dates.dateOf(start, viewedWeek, s.dayOfWeek);
+        if (ymd.isEmpty()) return null;
+        RainForecast.Hit hit = RainWeather.querySession(a, ymd, s, null);
+        if (hit == null || !hit.isRaining()) return null;
+
+        int rainColor = G.NIGHT ? RainForecast.RAIN_BLUE_NIGHT : RainForecast.RAIN_BLUE_DAY;
+        LinearLayout b = box();
+        b.addView(mono("WEATHER · 下雨提醒", 11f, G.MUTE));
+
+        float sd = a.getResources().getDisplayMetrics().scaledDensity;
+        String head = hit.summaryText();
+        SpannableStringBuilder sb = new SpannableStringBuilder(head);
+        sb.setSpan(new AbsoluteSizeSpan(Math.round(20 * sd)), 0, head.length(), 0);
+        sb.setSpan(new StyleSpan(Typeface.BOLD), 0, head.length(), 0);
+        sb.setSpan(new ForegroundColorSpan(rainColor), 0, head.length(), 0);
+
+        int tailStart = sb.length();
+        sb.append("  · ").append(RainForecast.levelName(hit.level));
+        if (hit.maxMm >= 0.1) {
+            sb.append(String.format(java.util.Locale.US, "（约 %.1f mm/h）", hit.maxMm));
+        }
+        sb.append("，记得带伞");
+        sb.setSpan(new AbsoluteSizeSpan(Math.round(12.5f * sd)), tailStart, sb.length(), 0);
+        sb.setSpan(new ForegroundColorSpan(G.SUB), tailStart, sb.length(), 0);
+
+        TextView big = new TextView(a);
+        big.setText(sb);
+        big.setTextSize(13f);
+        big.setTextColor(G.SUB);
+        big.setPadding(0, Ui.dp(a, 6), 0, 0);
+        b.addView(big);
+        return b;
     }
 
     // ------------------------------------------------------------ 这节课值多少钱

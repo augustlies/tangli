@@ -514,6 +514,37 @@
                 <TextView
                     style="@style/G.RowChevron" />
             </LinearLayout>
+
+            <View style="@style/G.Hair" />
+
+            <LinearLayout
+                android:id="@+id/row_rain_hint"
+                style="@style/G.Row">
+
+                <TextView
+                    style="@style/G.RowIndex"
+                    android:text="03" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        style="@style/G.RowTitle"
+                        android:text="课块下雨提示" />
+
+                    <TextView
+                        style="@style/G.RowSub"
+                        android:text="上课时间段可能下雨时，课程卡片泛起雨雾提醒带伞" />
+                </LinearLayout>
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switch_rain_hint"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

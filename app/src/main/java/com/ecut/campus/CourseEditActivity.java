@@ -102,7 +102,7 @@ public class CourseEditActivity extends AppCompatActivity {
         prepareDraft(sessionIndex);
         renderAll();
         com.ecut.campus.fun.CourseExtras.attach(this, findViewById(R.id.course_extras),
-                timetable, editingCourse, sessionIndex);
+                timetable, editingCourse, selectedSessionIndex, currentWeek);
 
         findViewById(R.id.btn_course_back).setOnClickListener(v -> confirmExit());
         findViewById(R.id.btn_course_save).setOnClickListener(v -> save());
@@ -258,6 +258,8 @@ public class CourseEditActivity extends AppCompatActivity {
                 selectedSessionIndex = idx;
                 renderSessionChips();
                 loadSessionIntoForm();
+                com.ecut.campus.fun.CourseExtras.attach(this, findViewById(R.id.course_extras),
+                        timetable, editingCourse, selectedSessionIndex, currentWeek);
             });
             sessionChipRow.addView(chip);
         }

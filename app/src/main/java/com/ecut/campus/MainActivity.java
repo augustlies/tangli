@@ -572,6 +572,14 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
             }
         }
         if (dockBlur != null) dockBlur.markDirty();
+        boolean hasCourses = currentTimetable != null && currentTimetable.courses != null
+                && !currentTimetable.courses.isEmpty();
+        if (currentTab == TAB_TIMETABLE) {
+            RainWeather.maybeAskPermissionOnce(this, hasCourses);
+        }
+        RainWeather.refreshIfNeeded(this, false, () -> {
+            if (!isFinishing() && timetableView != null) timetableView.invalidate();
+        });
     }
 
     private void openCourseEditor(@Nullable Timetable.Course course, Timetable.Session session) {
@@ -731,6 +739,16 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
             else new Thread(() -> {
                 if (WidgetBg.importFrom(getApplicationContext(), picked)) ClassWidget.updateAll(getApplicationContext());
             }, "widget-bg").start();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == RainWeather.REQ_LOCATION && RainWeather.hasPermission(this)) {
+            RainWeather.refreshIfNeeded(this, true, () -> {
+                if (!isFinishing() && timetableView != null) timetableView.invalidate();
+            });
         }
     }
 

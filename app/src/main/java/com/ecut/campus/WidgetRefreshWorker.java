@@ -50,6 +50,7 @@ public class WidgetRefreshWorker extends Worker {
         }
         try {
             Prefs.markWidgetBgRefresh(c);
+            RainWeather.refreshInWorkerIfNeeded(c);
             ClassWidget.updateAll(c);
         } catch (Throwable ignored) {
         }

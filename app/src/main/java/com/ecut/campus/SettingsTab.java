@@ -65,6 +65,27 @@ final class SettingsTab {
         if (icsRow != null) icsRow.setOnClickListener(v -> a.exportIcs());
         bindClassRemind();
         bindNextClassNotice();
+        com.google.android.material.materialswitch.MaterialSwitch rainSw =
+                settingsFragment.findViewById(R.id.switch_rain_hint);
+        if (rainSw != null) {
+            rainSw.setChecked(Prefs.rainHint(a));
+            rainSw.setOnCheckedChangeListener((b, on) -> {
+                Prefs.setRainHint(a, on);
+                if (on) {
+                    if (!RainWeather.hasPermission(a)) {
+                        RainWeather.askPermissionFromSetting(a);
+                    } else {
+                        RainWeather.refreshIfNeeded(a, false, a::refreshTimetableTab);
+                    }
+                }
+                a.refreshTimetableTab();
+                ClassWidget.updateAll(a.getApplicationContext());
+            });
+            View rainRow = settingsFragment.findViewById(R.id.row_rain_hint);
+            if (rainRow != null) {
+                rainRow.setOnClickListener(v -> rainSw.toggle());
+            }
+        }
         com.google.android.material.materialswitch.MaterialSwitch gradeSw =
                 settingsFragment.findViewById(R.id.switch_grade_notify);
         if (gradeSw != null) {
@@ -280,6 +301,11 @@ final class SettingsTab {
             String start = Prefs.semesterStartDate(a);
             timetableSummary.setText((Prefs.displayDays(a) == 5 ? "五天模式" : "七天模式")
                     + (start.isEmpty() ? "  ·  未设开学日期" : ""));
+        }
+        com.google.android.material.materialswitch.MaterialSwitch rainSw =
+                settingsFragment.findViewById(R.id.switch_rain_hint);
+        if (rainSw != null && rainSw.isChecked() != Prefs.rainHint(a)) {
+            rainSw.setChecked(Prefs.rainHint(a));
         }
 
         SchoolProfile school = Schools.current(a);

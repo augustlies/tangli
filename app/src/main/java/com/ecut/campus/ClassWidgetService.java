@@ -34,10 +34,29 @@ public final class ClassWidgetService extends RemoteViewsService {
         countdown(v, ch, builtAt, nowMin);
         v.setTextViewText(R.id.wi_tag, ch.tag);
         v.setViewVisibility(R.id.wi_tag, ch.tag.isEmpty() ? View.GONE : View.VISIBLE);
-        if (theme == ClassWidget.THEME_SYSTEM) {
+        boolean night = ClassWidget.isNight(c, theme);
+        Context tc = ClassWidget.themed(c, theme == ClassWidget.THEME_SYSTEM
+                ? (night ? ClassWidget.THEME_NIGHT : ClassWidget.THEME_DAY) : theme);
+        if (ch.rainLevel > com.ecut.campus.data.RainForecast.NONE) {
+            int bgColor = ContextCompat.getColor(tc, ClassWidget.PIG[idx]);
+            int fgColor = TimetableView.courseFgColor(idx, night);
+            boolean hasRight = !ch.tag.isEmpty() || ch.cdKind != WidgetDay.Chip.CD_NONE;
+            int seed = (ch.name != null ? ch.name.hashCode() : 0) * 31 + idx;
+            v.setImageViewBitmap(R.id.wi_bg, RainWeather.widgetChipBitmap(
+                    c, bgColor, fgColor, night, ch.rainLevel, chipAlpha, hasRight, seed));
+            v.setInt(R.id.wi_bg, "setColorFilter", 0);
+            v.setInt(R.id.wi_bg, "setImageAlpha", 255);
+            if (theme != ClassWidget.THEME_SYSTEM) {
+                v.setTextColor(R.id.wi_name, ContextCompat.getColor(tc, R.color.w_ink));
+                v.setTextColor(R.id.wi_line, ContextCompat.getColor(tc, R.color.w_chip_sub));
+                v.setTextColor(R.id.wi_tag, ContextCompat.getColor(tc, R.color.w_accent));
+                v.setTextColor(R.id.wi_cd_live, ContextCompat.getColor(tc, R.color.w_accent));
+                v.setTextColor(R.id.wi_cd_soon, ContextCompat.getColor(tc, R.color.w_chip_sub));
+            }
+        } else if (theme == ClassWidget.THEME_SYSTEM) {
             v.setImageViewResource(R.id.wi_bg, ClassWidget.CHIP[idx]);
+            if (chipAlpha < 255) v.setInt(R.id.wi_bg, "setImageAlpha", chipAlpha);
         } else {
-            Context tc = ClassWidget.themed(c, theme);
             v.setImageViewResource(R.id.wi_bg, R.drawable.w_chip_shape);
             v.setInt(R.id.wi_bg, "setColorFilter", ContextCompat.getColor(tc, ClassWidget.PIG[idx]));
             v.setTextColor(R.id.wi_name, ContextCompat.getColor(tc, R.color.w_ink));
@@ -45,8 +64,8 @@ public final class ClassWidgetService extends RemoteViewsService {
             v.setTextColor(R.id.wi_tag, ContextCompat.getColor(tc, R.color.w_accent));
             v.setTextColor(R.id.wi_cd_live, ContextCompat.getColor(tc, R.color.w_accent));
             v.setTextColor(R.id.wi_cd_soon, ContextCompat.getColor(tc, R.color.w_chip_sub));
+            if (chipAlpha < 255) v.setInt(R.id.wi_bg, "setImageAlpha", chipAlpha);
         }
-        if (chipAlpha < 255) v.setInt(R.id.wi_bg, "setImageAlpha", chipAlpha);
         v.setOnClickFillInIntent(R.id.wi_root, new Intent());
         return v;
     }

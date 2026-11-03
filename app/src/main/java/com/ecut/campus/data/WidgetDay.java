@@ -23,6 +23,8 @@ public final class WidgetDay {
         public String tag = "";
         public boolean ongoing;
         public int colorIndex;
+        /** 雨级：0=不下雨，1=小雨，2=中雨，3=大雨 */
+        public int rainLevel;
         /** 倒计时：无 / 「还剩 mm:ss」（正在上，到下课）/ 「mm:ss 后上课」（下一门，开始前 60 分钟内） */
         public static final int CD_NONE = 0, CD_LEFT = 1, CD_SOON = 2;
         public int cdKind = CD_NONE;
@@ -172,6 +174,7 @@ public final class WidgetDay {
         ch.name = it.name;
         ch.line = level == WIDE ? line(it) : timeRange(it); // 先丢教室，时间留着
         ch.colorIndex = it.colorIndex;
+        ch.rainLevel = it.rainLevel;
         return ch;
     }
     /** 「10:00 - 11:40」 */

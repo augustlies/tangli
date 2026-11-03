@@ -182,7 +182,8 @@ public final class ClassWidget extends AppWidgetProvider {
         if (h <= 0) h = 165;
         float fs = Math.max(0.85f, c.getResources().getConfiguration().fontScale);
         float head = level == WidgetDay.NARROW ? 27 + 22 * fs : 28 + 38 * fs;
-        return Math.max(1, (int) ((h - head + 5) / (15 + 35 * fs)));
+        return Math.max(1, Math.min(com.ecut.campus.data.RainForecast.WIDGET_MAX_CHIPS,
+                (int) ((h - head + 5) / (15 + 35 * fs))));
     }
 
     /** 小组件竖屏宽度（dp），拿不到按 4×2 常见的 250。 */
@@ -207,7 +208,18 @@ public final class ClassWidget extends AppWidgetProvider {
         int week = Dates.valid(x.start) ? Dates.weekOf(x.start, ymd) : 0;
         int state = state(x, week);
         List<DayPlan.Item> today = state == WidgetDay.OK ? ClassPlans.day(x, ymd) : null;
-        List<DayPlan.Item> tomorrow = state == WidgetDay.OK ? ClassPlans.day(x, Dates.addDays(ymd, 1)) : null;
+        String tomorrowYmd = Dates.addDays(ymd, 1);
+        List<DayPlan.Item> tomorrow = state == WidgetDay.OK ? ClassPlans.day(x, tomorrowYmd) : null;
+        if (today != null) {
+            for (DayPlan.Item it : today) {
+                it.rainLevel = RainWeather.levelFor(c, ymd, it.startMin, it.endMin);
+            }
+        }
+        if (tomorrow != null) {
+            for (DayPlan.Item it : tomorrow) {
+                it.rainLevel = RainWeather.levelFor(c, tomorrowYmd, it.startMin, it.endMin);
+            }
+        }
         return WidgetDay.build(state, ymd, week, x.start, today, tomorrow, nowMin, cap, level);
     }
 
@@ -330,6 +342,7 @@ public final class ClassWidget extends AppWidgetProvider {
                 .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
                 .setData(Uri.parse("tangli-widget://classes/" + id + "?cap=" + cap + "&w=" + level + "&theme=" + itemTheme
                         + "&v=" + BuildConfig.VERSION_CODE // 升级后换一份新列表，免得桌面用着旧连接
+                        + "&r=" + RainWeather.widgetStamp(c)
                         + (look != null ? "&bg=" + Prefs.widgetBgVer(c) + "&ca=" + ca : "")));
         if (Build.VERSION.SDK_INT >= 31) {
             // Android 12+：课程条直接装进小组件，不再让桌面去连列表服务。

@@ -97,6 +97,12 @@ public class TimetableView extends View {
         return G.NIGHT ? G.mix(PALETTE_GLASS[idx], 0xFFFFFFFF, 0.35f) : G.mix(LIGHT_FG[idx], 0xFF000000, 0.18f);
     }
 
+    /** 指定课程色在日/夜模式下的字色与色条色（供桌面小组件共用）。 */
+    public static int courseFgColor(int idx, boolean night) {
+        int i = Math.abs(idx) % LIGHT_FG.length;
+        return night ? G.mix(LIGHT_BG[i], 0xFFFFFFFF, 0.10f) : LIGHT_FG[i];
+    }
+
     /** 深色模式下把暖色课块换成「深底 + 浅字」，色相保持一致。 */
     public static void applyPalette(boolean night) {
         for (int k = 0; k < PALETTE_BG.length; k++) {
@@ -142,6 +148,7 @@ public class TimetableView extends View {
     private final Paint accentPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint badgePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint pageEdgePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint rainPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final android.graphics.Path clipPath = new android.graphics.Path();
     private final TextPaint bpSub = new TextPaint(), bpMono = new TextPaint(), bpTagCn = new TextPaint(), bpTagNum = new TextPaint();
     private final TextPaint textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
@@ -174,6 +181,8 @@ public class TimetableView extends View {
     private boolean pageAnimating;
     /** 正在吸附、尚未提交的翻页方向；0 表示无。快速连续滑动时由新手势立即提交。 */
     private int pendingCommit;
+    @Nullable
+    private com.ecut.campus.data.RainForecast rainPreviewOverride;
 
     private static final class HitBlock {
         final RectF rect;
@@ -700,9 +709,13 @@ public class TimetableView extends View {
 
         int textColor = isActive ? fgColor : INK_3;
         int liveLeft = -1;
+        float progress = isActive && tag == null ? liveProgress(s) : -1f;
+        boolean live = progress >= 0f;
+        int rainLv = isActive && tag == null ? resolveRainLevel(s) : com.ecut.campus.data.RainForecast.NONE;
+        if (rainLv > com.ecut.campus.data.RainForecast.NONE) {
+            drawRainOuterGlow(canvas, rect, radius, rainLv, live);
+        }
         if (isActive) {
-            float progress = tag == null ? liveProgress(s) : -1f;
-            boolean live = progress >= 0f;
             if (live) {
                 // 正在上的课：保留课色，已上的部分略深（夜间略浅），外加红框 + 左侧红书脊；不再用墨色实块
                 int fill = bgColor;
@@ -714,6 +727,9 @@ public class TimetableView extends View {
                 blockPaint.setStyle(Paint.Style.FILL);
                 blockPaint.setColor(fill);
                 canvas.drawRoundRect(rect, radius, radius, blockPaint);
+                if (rainLv > com.ecut.campus.data.RainForecast.NONE) {
+                    drawRainInnerMist(canvas, rect, radius, rainLv, true);
+                }
                 canvas.save();
                 clipPath.reset();
                 clipPath.addRoundRect(rect, radius, radius, android.graphics.Path.Direction.CW);
@@ -748,6 +764,9 @@ public class TimetableView extends View {
                 int glass = PALETTE_GLASS[colorIdx];
                 blockPaint.setColor(G.NIGHT ? G.alpha(G.mix(glass, 0xFF000000, 0.58f), 0xC8) : G.alpha(glass, 0xD6));
                 canvas.drawRoundRect(rect, radius, radius, blockPaint);
+                if (rainLv > com.ecut.campus.data.RainForecast.NONE) {
+                    drawRainInnerMist(canvas, rect, radius, rainLv, false);
+                }
                 blockPaint.setStyle(Paint.Style.STROKE);
                 blockPaint.setStrokeWidth(Math.max(1f, dp(0.8f)));
                 blockPaint.setColor(G.alpha(0xFFFFFFFF, G.NIGHT ? 0x26 : 0xCC));
@@ -757,6 +776,9 @@ public class TimetableView extends View {
                 blockPaint.setStyle(Paint.Style.FILL);
                 blockPaint.setColor(bgColor);
                 canvas.drawRoundRect(rect, radius, radius, blockPaint);
+                if (rainLv > com.ecut.campus.data.RainForecast.NONE) {
+                    drawRainInnerMist(canvas, rect, radius, rainLv, false);
+                }
 
                 // 发丝书脊：左侧 2dp 实色
                 accentPaint.setStyle(Paint.Style.FILL);
@@ -790,10 +812,83 @@ public class TimetableView extends View {
             blockPaint.setPathEffect(null);
         }
 
-        drawBlockText(canvas, rect, course, s, isActive, textColor, tag, liveLeft);
+        drawBlockText(canvas, rect, course, s, isActive, textColor, tag, liveLeft, rainLv);
         HitBlock hb = new HitBlock(rect, course, s, isActive);
         hitBlocks.add(hb);
         return hb;
+    }
+
+    /** 供预览或测试注入指定天气数据；正常运行时传 null 走 RainWeather。 */
+    public void setRainPreviewOverride(@Nullable com.ecut.campus.data.RainForecast forecast) {
+        this.rainPreviewOverride = forecast;
+        invalidate();
+    }
+
+    private int resolveRainLevel(Timetable.Session s) {
+        if (semesterStartDate == null || semesterStartDate.isEmpty()) {
+            return com.ecut.campus.data.RainForecast.NONE;
+        }
+        com.ecut.campus.data.RainForecast rf = rainPreviewOverride != null
+                ? rainPreviewOverride : RainWeather.current(getContext());
+        if (rf == null) return com.ecut.campus.data.RainForecast.NONE;
+        String ymd = com.ecut.campus.data.Dates.dateOf(semesterStartDate, currentWeek, s.dayOfWeek);
+        if (ymd.isEmpty()) return com.ecut.campus.data.RainForecast.NONE;
+        return rf.query(ymd, sessionStartMin(s), sessionEndMin(s), System.currentTimeMillis()).level;
+    }
+
+    /**
+     * 1. 静态雨蓝光晕：课块外圈一层模糊的冷色「雨蓝」光晕（日间 #5B7FA6、夜间 #8FB3DA）。
+     * 正在上的课（live）有朱砂框，光晕强度减半。
+     */
+    private void drawRainOuterGlow(Canvas canvas, RectF rect, float radius, int rainLv, boolean live) {
+        float glow = com.ecut.campus.data.RainForecast.glowStrength(rainLv);
+        if (glow <= 0f) return;
+        int rainBlue = G.NIGHT
+                ? com.ecut.campus.data.RainForecast.RAIN_BLUE_NIGHT
+                : com.ecut.campus.data.RainForecast.RAIN_BLUE_DAY;
+        float factor = live ? 0.5f : 1f;
+        float k = glow * factor * (G.NIGHT ? 0.78f : 0.56f);
+        float[] radiiDp = {7.2f, 5.6f, 4.2f, 3.0f, 2.0f, 1.0f};
+        float[] weights = {0.10f, 0.14f, 0.18f, 0.22f, 0.26f, 0.30f};
+        rainPaint.setShader(null);
+        rainPaint.setStyle(Paint.Style.FILL);
+        for (int i = 0; i < radiiDp.length; i++) {
+            float r = dp(radiiDp[i]);
+            int a = Math.max(1, Math.min(255, Math.round(255f * weights[i] * k)));
+            rainPaint.setColor(G.alpha(rainBlue, a));
+            canvas.drawRoundRect(
+                    new RectF(rect.left - r, rect.top - r, rect.right + r, rect.bottom + r),
+                    radius + r, radius + r, rainPaint);
+        }
+    }
+
+    /**
+     * 2. 卡内静态水汽：卡片上半部一层很淡的冷色渐变。
+     * 正在上的课（live）水汽强度减半。
+     */
+    private void drawRainInnerMist(Canvas canvas, RectF rect, float radius, int rainLv, boolean live) {
+        float glow = com.ecut.campus.data.RainForecast.glowStrength(rainLv);
+        if (glow <= 0f) return;
+        int rainBlue = G.NIGHT
+                ? com.ecut.campus.data.RainForecast.RAIN_BLUE_NIGHT
+                : com.ecut.campus.data.RainForecast.RAIN_BLUE_DAY;
+        float factor = live ? 0.5f : 1f;
+        int topA = Math.max(1, Math.min(255, Math.round(60f * glow * factor)));
+        float mistH = rect.height() * 0.5f;
+        if (mistH <= dp(4f)) return;
+        canvas.save();
+        clipPath.reset();
+        clipPath.addRoundRect(rect, radius, radius, android.graphics.Path.Direction.CW);
+        canvas.clipPath(clipPath);
+        rainPaint.setStyle(Paint.Style.FILL);
+        rainPaint.setShader(new LinearGradient(
+                0, rect.top, 0, rect.top + mistH,
+                new int[]{G.alpha(rainBlue, topA), G.alpha(rainBlue, topA / 4), 0x00000000},
+                new float[]{0f, 0.5f, 1f},
+                android.graphics.Shader.TileMode.CLAMP));
+        canvas.drawRect(rect.left, rect.top, rect.right, rect.top + mistH, rainPaint);
+        rainPaint.setShader(null);
+        canvas.restore();
     }
 
     /** 第 p 节边界（0 = 第 1 节顶部）对应的 y。 */
@@ -1049,7 +1144,7 @@ public class TimetableView extends View {
     }
 
     private void drawBlockText(Canvas canvas, RectF rect, Timetable.Course course,
-                               Timetable.Session s, boolean isActive, int textColor, String tag, int liveLeft) {
+                               Timetable.Session s, boolean isActive, int textColor, String tag, int liveLeft, int rainLv) {
         float innerLeft = rect.left + (isActive ? dp(6.2f) : dp(4.0f));
         float innerRight = rect.right - dp(2.2f);
         float innerWidth = Math.max(dp(16), innerRight - innerLeft);
@@ -1120,6 +1215,14 @@ public class TimetableView extends View {
                 tagH);
         if (plan[0] < titleLines) titleLayout = textLayout(title, textPaint, w, plan[0], 1.02f);
 
+        if (rainLv > com.ecut.campus.data.RainForecast.NONE) {
+            float liveTagW = (plan[1] & 8) != 0 && tagPre != null
+                    ? tagWidth(tagPre, String.valueOf(liveLeft), tagCn, tagNum) : 0f;
+            drawRainStreaks(canvas, rect, course, s, textColor, rainLv,
+                    innerLeft, innerTop, titleLayout, plan[1], gap,
+                    timeL, teacherL, tagH, liveTagW, locL);
+        }
+
         canvas.translate(innerLeft, innerTop);
         titleLayout.draw(canvas);
         float y = titleLayout.getHeight();
@@ -1151,6 +1254,114 @@ public class TimetableView extends View {
             badgePaint.setColor(G.alarm());
             canvas.drawRect(rect.left, rect.top + dp(2f), rect.left + dp(2.4f), rect.bottom - dp(2f), badgePaint);
         }
+    }
+
+    /**
+     * 3. 斜向静态细雨丝：只画在卡片右半边、课名和教室中间的空白处，上下两端淡出；
+     * 严格避开已排版的课名、时间、教师、进行中标签和教室文字区域。
+     */
+    private void drawRainStreaks(Canvas canvas, RectF rect, Timetable.Course course, Timetable.Session s,
+                                 int textColor, int rainLv, float innerLeft, float innerTop,
+                                 StaticLayout titleLayout, int mask, float gap,
+                                 @Nullable StaticLayout timeL, @Nullable StaticLayout teacherL,
+                                 float tagH, float liveTagW, @Nullable StaticLayout locL) {
+        int n = com.ecut.campus.data.RainForecast.streakCount(rainLv);
+        if (n <= 0) return;
+        float w = rect.width(), h = rect.height();
+        float topBand = Math.max(rect.top + dp(22f), innerTop + titleLayout.getHeight() + dp(2f));
+        float botBand = rect.bottom - dp(14f);
+        if (botBand - topBand < dp(12f)) return;
+
+        // 收集课块内每一段文字的真实占宽，雨丝遇到文字行时自动往右让开或跳过
+        float[] boxTop = new float[6];
+        float[] boxBot = new float[6];
+        float[] boxRight = new float[6];
+        int boxCount = 0;
+        float curY = innerTop + titleLayout.getHeight();
+        if ((mask & 2) != 0 && timeL != null) {
+            boxTop[boxCount] = curY + gap - dp(1.5f);
+            boxBot[boxCount] = curY + gap + timeL.getHeight() + dp(1.5f);
+            boxRight[boxCount] = innerLeft + maxLineWidth(timeL) + dp(3f);
+            boxCount++;
+            curY += gap + timeL.getHeight();
+        }
+        if ((mask & 4) != 0 && teacherL != null) {
+            boxTop[boxCount] = curY + gap - dp(1.5f);
+            boxBot[boxCount] = curY + gap + teacherL.getHeight() + dp(1.5f);
+            boxRight[boxCount] = innerLeft + maxLineWidth(teacherL) + dp(3f);
+            boxCount++;
+            curY += gap + teacherL.getHeight();
+        }
+        if ((mask & 8) != 0 && tagH > 0f) {
+            boxTop[boxCount] = curY + gap - dp(1.5f);
+            boxBot[boxCount] = curY + gap + tagH + dp(1.5f);
+            boxRight[boxCount] = innerLeft + liveTagW + dp(3f);
+            boxCount++;
+            curY += gap + tagH;
+        }
+        if ((mask & 1) != 0 && locL != null) {
+            boxTop[boxCount] = curY + gap - dp(1.5f);
+            boxBot[boxCount] = curY + gap + locL.getHeight() + dp(1.5f);
+            boxRight[boxCount] = innerLeft + maxLineWidth(locL) + dp(3f);
+            boxCount++;
+        }
+
+        float baseLen = dp(com.ecut.campus.data.RainForecast.streakLenDp(rainLv));
+        int baseAlpha = com.ecut.campus.data.RainForecast.streakAlpha(rainLv);
+        int seed = ((course.name != null ? course.name.hashCode() : 0) * 31 + s.dayOfWeek * 7 + s.startSection) ^ 0x5A3C;
+        java.util.Random rnd = new java.util.Random(seed);
+        final float cos70 = 0.34202015f;
+        final float sin70 = 0.9396926f;
+
+        rainPaint.setShader(null);
+        rainPaint.setStyle(Paint.Style.STROKE);
+        rainPaint.setStrokeCap(Paint.Cap.ROUND);
+        rainPaint.setStrokeWidth(Math.max(1f, dp(0.9f)));
+        float spanY = botBand - topBand;
+        float maxRight = rect.right - dp(2.4f);
+        for (int i = 0; i < n; i++) {
+            float r1 = rnd.nextFloat();
+            float r2 = rnd.nextFloat();
+            float r3 = rnd.nextFloat();
+            float u = (i + 0.5f) / n;
+            float normY = (u + 0.07f * r1) % 1f;
+            if (normY < 0f) normY += 1f;
+            float sy = topBand + spanY * normY;
+            float sx = rect.left + w * (0.45f + 0.50f * r2);
+            float L = baseLen * (0.7f + 0.3f * r3);
+            float ex = sx - L * cos70;
+            float ey = sy + L * sin70;
+
+            boolean skip = false;
+            for (int b = 0; b < boxCount; b++) {
+                if (ey >= boxTop[b] && sy <= boxBot[b] && ex < boxRight[b]) {
+                    float shiftedSx = Math.max(sx, boxRight[b] + L * cos70 + dp(1.5f));
+                    if (shiftedSx <= maxRight) {
+                        sx = shiftedSx;
+                        ex = sx - L * cos70;
+                    } else {
+                        skip = true;
+                        break;
+                    }
+                }
+            }
+            if (skip || sx > maxRight) continue;
+
+            float t = (sy - topBand) / spanY;
+            float fd = Math.min(1f, t * 4f) * Math.min(1f, (1f - t) * 3f);
+            int a = Math.round(baseAlpha * fd);
+            if (a <= 4) continue;
+            rainPaint.setColor(G.alpha(textColor, a));
+            canvas.drawLine(sx, sy, ex, ey, rainPaint);
+        }
+    }
+
+    private static float maxLineWidth(StaticLayout layout) {
+        float max = 0f;
+        for (int i = 0; i < layout.getLineCount(); i++) {
+            max = Math.max(max, layout.getLineWidth(i));
+        }
+        return max;
     }
 
     private static StaticLayout textLayout(String t, TextPaint p, int width, int maxLines, float mult) {

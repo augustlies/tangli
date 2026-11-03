@@ -55,14 +55,14 @@ final class BgAllow {
         String vendor = vendorName();
         String msg = "有的手机为了省电会把后台的烫梨冻住，小组件就得等你打开烫梨才翻到下一节。放行一次就好：\n\n"
                 + (ok ? "1. 允许后台运行 —— 已经允许了 ✓\n" : "1. 点「允许后台运行」，在弹窗里选「允许」\n")
-                + "2. 点「" + vendor + "」，找到烫梨，打开「自启动」"
+                + "2. 点「去开自启动」，找到烫梨，打开「自启动」"
                 + ("vivo".equals(vendor) || "iQOO".equals(vendor) ? "和「允许后台高耗电」" : "和「后台运行」")
                 + "\n\n只用来按上下课时间刷新卡片，一天就几次，基本不耗电。";
         androidx.appcompat.app.AlertDialog.Builder b = new androidx.appcompat.app.AlertDialog.Builder(a)
                 .setTitle("让小组件自己翻页")
                 .setMessage(msg)
                 .setNeutralButton("以后再说", null)
-                .setNegativeButton(vendor + "设置", (d, w) -> openVendor(a));
+                .setNegativeButton("去开自启动", (d, w) -> openVendor(a));
         if (!ok) b.setPositiveButton("允许后台运行", (d, w) -> requestIgnore(a));
         b.show();
     }

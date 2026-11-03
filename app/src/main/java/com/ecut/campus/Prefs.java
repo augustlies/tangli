@@ -265,4 +265,32 @@ public final class Prefs {
     /** 「允许后台刷新」引导是否已经主动弹过（只主动弹一次，设置里随时能再点）。 */
     public static boolean bgGuideShown(Context ctx) { return sp(ctx).getBoolean("bg_guide_shown", false); }
     public static void setBgGuideShown(Context ctx) { sp(ctx).edit().putBoolean("bg_guide_shown", true).apply(); }
+
+    // ===== 1.2.10：课块下雨提示 =====
+    /** 课块下雨提示开关，默认开启。 */
+    public static boolean rainHint(Context ctx) { return sp(ctx).getBoolean("rain_hint", true); }
+    public static void setRainHint(Context ctx, boolean on) { sp(ctx).edit().putBoolean("rain_hint", on).apply(); }
+    /** 是否已首次主动询问过定位权限（拒绝后不再纠缠）。 */
+    public static boolean rainPermAsked(Context ctx) { return sp(ctx).getBoolean("rain_perm_asked", false); }
+    public static void setRainPermAsked(Context ctx, boolean v) { sp(ctx).edit().putBoolean("rain_perm_asked", v).apply(); }
+    /** 上次成功拉取天气预报的时间戳（毫秒）。 */
+    public static long rainFetchedAt(Context ctx) { return sp(ctx).getLong("rain_fetched_at", 0L); }
+    public static void setRainFetchedAt(Context ctx, long t) { sp(ctx).edit().putLong("rain_fetched_at", t).apply(); }
+    /** 最近一次粗略定位坐标（仅在仍有定位权限时用作兜底）。 */
+    public static void setRainLocation(Context ctx, double lat, double lon) {
+        sp(ctx).edit()
+                .putString("rain_lat", Double.toString(lat))
+                .putString("rain_lon", Double.toString(lon))
+                .apply();
+    }
+    public static double[] rainLocation(Context ctx) {
+        String a = sp(ctx).getString("rain_lat", "");
+        String b = sp(ctx).getString("rain_lon", "");
+        if (a == null || b == null || a.isEmpty() || b.isEmpty()) return null;
+        try {
+            return new double[]{Double.parseDouble(a), Double.parseDouble(b)};
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
 }

@@ -22,6 +22,8 @@ public final class DayPlan {
         public String tag = "";
         /** 课程色板下标（和课表同色） */
         public int colorIndex;
+        /** 雨级：0=不下雨，1=小雨，2=中雨，3=大雨（见 RainForecast） */
+        public int rainLevel;
 
         public String timeLabel() {
             return Timetable.Session.formatHm(startMin) + "-" + Timetable.Session.formatHm(endMin);
