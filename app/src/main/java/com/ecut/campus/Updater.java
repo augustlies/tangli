@@ -27,7 +27,7 @@ public final class Updater {
     public static final String REPO_URL = "https://github.com/" + REPO;
     public static final String RELEASES_URL = REPO_URL + "/releases";
     public static final String ISSUES_URL = REPO_URL + "/issues/new";
-    public static final String FEEDBACK_EMAIL = "sueexin@163.com";
+    public static final String FEEDBACK_EMAIL = "contact@sueexin.dev";
     private static final String API = "https://api.github.com/repos/" + REPO + "/releases/latest";
     private static final long AUTO_INTERVAL = 6L * 60 * 60 * 1000;
 
