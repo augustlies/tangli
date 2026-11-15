@@ -1075,7 +1075,6 @@
                         android:layout_width="0dp"
                         android:layout_height="42dp"
                         android:layout_weight="1"
-                        android:layout_marginStart="10dp"
                         android:text="清空本地数据"
                         android:textColor="?attr/gAccent"
                         android:textSize="12.5sp" />

@@ -31,6 +31,10 @@ final class SettingsTab {
     }
 
     void bind() {
+        View scroll = settingsFragment.findViewById(R.id.settings_scroll);
+        if (scroll != null) {
+            scroll.setOnScrollChangeListener((v, sx, sy, osx, osy) -> a.refreshDockBlur());
+        }
         TextView versionTv = settingsFragment.findViewById(R.id.tv_about_version);
         if (versionTv != null) {
             versionTv.setText("烫梨 · v" + BuildConfig.VERSION_NAME);
@@ -178,24 +182,38 @@ final class SettingsTab {
     private int settingsPage = R.id.settings_page_root;
 
     void showPage(int pageId) {
+        showPage(pageId, true);
+    }
+
+    void showPage(int pageId, boolean animate) {
         int[] pages = {R.id.settings_page_root, R.id.settings_page_timetable, R.id.settings_page_general};
         boolean forward = pageId != R.id.settings_page_root;
         for (int id : pages) {
             View p = settingsFragment.findViewById(id);
             if (p == null) continue;
+            p.animate().cancel();
             if (id == pageId) {
                 p.setVisibility(View.VISIBLE);
-                p.setAlpha(0f);
-                p.setTranslationX((forward ? 1 : -1) * 36 * a.getResources().getDisplayMetrics().density);
-                p.animate().alpha(1f).translationX(0f).setDuration(220)
-                        .setInterpolator(new android.view.animation.DecelerateInterpolator(1.6f)).start();
+                if (animate) {
+                    p.setAlpha(0f);
+                    p.setTranslationX((forward ? 1 : -1) * 36 * a.getResources().getDisplayMetrics().density);
+                    p.animate().alpha(1f).translationX(0f).setDuration(220)
+                            .setInterpolator(new android.view.animation.DecelerateInterpolator(1.6f)).start();
+                } else {
+                    p.setAlpha(1f);
+                    p.setTranslationX(0f);
+                }
             } else {
                 p.setVisibility(View.GONE);
             }
         }
         settingsPage = pageId;
         View scroll = settingsFragment.findViewById(R.id.settings_scroll);
-        if (scroll != null) scroll.scrollTo(0, 0);
+        if (scroll != null) {
+            scroll.scrollTo(0, 0);
+            scroll.post(a::refreshDockBlur);
+        }
+        a.refreshDockBlur();
     }
 
     /** 主题两段：纸墨 / 磨砂玻璃。切换时从点的位置圆形扩散。 */

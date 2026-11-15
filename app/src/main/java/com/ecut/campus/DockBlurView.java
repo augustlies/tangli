@@ -24,7 +24,10 @@ public class DockBlurView extends View {
 
     private View source;
     private Bitmap snapshot;
+    private Canvas snapshotCanvas;
     private final Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
+    private final Rect srcRect = new Rect();
+    private final RectF dstRect = new RectF();
     private boolean dirty = true;
     private final int extraTopPx;
 
@@ -70,20 +73,28 @@ public class DockBlurView extends View {
         int scale = 3;
         int bw = Math.max(1, w / scale);
         int bh = Math.max(1, (h + extraTopPx) / scale);
-        if (dirty || snapshot == null || snapshot.getWidth() != bw || snapshot.getHeight() != bh) {
-            if (snapshot != null) snapshot.recycle();
-            snapshot = Bitmap.createBitmap(bw, bh, Bitmap.Config.ARGB_8888);
-            Canvas c = new Canvas(snapshot);
-            c.scale(1f / scale, 1f / scale);
+        int srcTop = Math.max(0, getTop() - extraTopPx);
+        boolean sizeChanged = snapshot == null || snapshot.getWidth() != bw || snapshot.getHeight() != bh;
+        if (dirty || sizeChanged) {
+            if (sizeChanged) {
+                if (snapshot != null) snapshot.recycle();
+                snapshot = Bitmap.createBitmap(bw, bh, Bitmap.Config.ARGB_8888);
+                snapshotCanvas = new Canvas(snapshot);
+            } else {
+                snapshot.eraseColor(0);
+            }
+            snapshotCanvas.save();
+            snapshotCanvas.scale(1f / scale, 1f / scale);
             // Dock 悬浮、不贴底：按自己在父布局里的实际位置截取
-            int srcTop = Math.max(0, getTop() - extraTopPx);
-            c.translate(-getLeft(), -srcTop);
-            source.draw(c);
+            snapshotCanvas.translate(-getLeft(), -srcTop);
+            source.draw(snapshotCanvas);
+            snapshotCanvas.restore();
             dirty = false;
         }
 
-        canvas.drawBitmap(snapshot,
-                new Rect(0, 0, snapshot.getWidth(), snapshot.getHeight()),
-                new RectF(0, 0, w, h), paint);
+        int cropTop = Math.round((getTop() - srcTop) / (float) scale);
+        srcRect.set(0, cropTop, snapshot.getWidth(), snapshot.getHeight());
+        dstRect.set(0, 0, w, h);
+        canvas.drawBitmap(snapshot, srcRect, dstRect, paint);
     }
 }

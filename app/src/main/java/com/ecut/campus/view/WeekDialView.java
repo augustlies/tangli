@@ -34,10 +34,17 @@ public class WeekDialView extends View {
     private final Paint tick = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint fade = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint center = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final RectF centerBandRect = new RectF();
+    private final RectF pointerRect = new RectF();
+    private final android.graphics.PorterDuffXfermode dstOutMode =
+            new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.DST_OUT);
+    private android.graphics.LinearGradient topFadeShader;
+    private android.graphics.LinearGradient bottomFadeShader;
+    private final int touchSlop;
 
     private VelocityTracker velocityTracker;
     private float downY, lastY, velocity;
-    private boolean dragging;
+    private boolean dragging, dragMoved;
     private ValueAnimator fling;
 
     public WeekDialView(Context context) {
@@ -45,6 +52,17 @@ public class WeekDialView extends View {
         text.setTextAlign(Paint.Align.CENTER);
         tick.setTextAlign(Paint.Align.CENTER);
         center.setColor(G.INK);
+        touchSlop = android.view.ViewConfiguration.get(context).getScaledTouchSlop();
+    }
+
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+        float fadeH = dp(40);
+        topFadeShader = new android.graphics.LinearGradient(
+                0, 0, 0, fadeH, 0xFF000000, 0x00000000, android.graphics.Shader.TileMode.CLAMP);
+        bottomFadeShader = new android.graphics.LinearGradient(
+                0, h, 0, h - fadeH, 0xFF000000, 0x00000000, android.graphics.Shader.TileMode.CLAMP);
     }
 
     public void configure(int current, int total, int actual) {
@@ -82,8 +100,8 @@ public class WeekDialView extends View {
 
         // 中央高亮带
         center.setAlpha(28);
-        canvas.drawRoundRect(new RectF(dp(8), centerY - rowH / 2, w - dp(8), centerY + rowH / 2),
-                dp(14), dp(14), center);
+        centerBandRect.set(dp(8), centerY - rowH / 2, w - dp(8), centerY + rowH / 2);
+        canvas.drawRoundRect(centerBandRect, dp(14), dp(14), center);
         center.setAlpha(255);
 
         int first = (int) Math.floor(scrollPos - h / 2 / rowH - 1);
@@ -107,18 +125,19 @@ public class WeekDialView extends View {
 
         // 指针侧条
         center.setAlpha(255);
-        canvas.drawRoundRect(new RectF(dp(6), centerY - dp(14), dp(10), centerY + dp(14)),
-                dp(2), dp(2), center);
+        pointerRect.set(dp(6), centerY - dp(14), dp(10), centerY + dp(14));
+        canvas.drawRoundRect(pointerRect, dp(2), dp(2), center);
 
-        fade.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.DST_OUT));
-        fade.setShader(new android.graphics.LinearGradient(
-                0, 0, 0, dp(40), 0xFF000000, 0x00000000, android.graphics.Shader.TileMode.CLAMP));
-        canvas.drawRect(0, 0, w, dp(40), fade);
-        fade.setShader(new android.graphics.LinearGradient(
-                0, h, 0, h - dp(40), 0xFF000000, 0x00000000, android.graphics.Shader.TileMode.CLAMP));
-        canvas.drawRect(0, h - dp(40), w, h, fade);
-        fade.setShader(null);
-        fade.setXfermode(null);
+        if (topFadeShader != null && bottomFadeShader != null) {
+            float fadeH = dp(40);
+            fade.setXfermode(dstOutMode);
+            fade.setShader(topFadeShader);
+            canvas.drawRect(0, 0, w, fadeH, fade);
+            fade.setShader(bottomFadeShader);
+            canvas.drawRect(0, h - fadeH, w, h, fade);
+            fade.setShader(null);
+            fade.setXfermode(null);
+        }
         canvas.restoreToCount(layer);
     }
 
@@ -134,14 +153,24 @@ public class WeekDialView extends View {
         velocityTracker.addMovement(event);
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
+                if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(true);
                 if (fling != null) { fling.cancel(); fling = null; }
                 dragging = true;
+                dragMoved = false;
                 downY = lastY = event.getY();
                 velocity = 0;
                 return true;
             case MotionEvent.ACTION_MOVE: {
                 if (!dragging) return true;
                 float y = event.getY();
+                if (!dragMoved && Math.abs(y - downY) < touchSlop) {
+                    return true;
+                }
+                if (!dragMoved) {
+                    dragMoved = true;
+                    lastY = y;
+                    return true;
+                }
                 float dy = y - lastY;
                 lastY = y;
                 float rowH = dp(40);
@@ -157,6 +186,13 @@ public class WeekDialView extends View {
                 velocityTracker.recycle();
                 velocityTracker = null;
                 float rowH = dp(40);
+                if (!dragMoved && Math.abs(event.getY() - downY) < touchSlop) {
+                    int tapped = Math.max(1, Math.min(totalWeeks,
+                            Math.round(scrollPos + (event.getY() - getHeight() / 2f) / rowH) + 1));
+                    setWeek(tapped);
+                    if (pickListener != null) pickListener.onPicked(week);
+                    return true;
+                }
                 // 惯性：把速度折算成滚动距离（指数衰减）
                 float flingPx = vy * 0.28f;
                 float target = Math.max(0, Math.min(totalWeeks - 1,

@@ -351,6 +351,7 @@ public final class DiagLog {
             for (int i = 0; i < Math.min(5, h.size()); i++) {
                 String[] lines = h.get(i).split("\n");
                 String first = lines.length > 1 ? lines[1] : lines[0];
+                if (first.contains("昵称")) first = "设置 昵称=***";
                 x.append("  ").append(lines.length).append("行 · ")
                         .append(scrub(first.length() > 40 ? first.substring(0, 40) + "…" : first)).append('\n');
             }

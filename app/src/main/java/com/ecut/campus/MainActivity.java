@@ -85,20 +85,24 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
             if (timetableView != null) timetableView.setBottomInset(dockInset());
         });
 
-        // 冷启动直接定位到现实中的本周，onResume 就不必再刷一遍
+        showTab(TAB_TIMETABLE);
+        // 冷启动先加载当前课表，再按所属学期定位到现实中的本周，onResume 就不必再刷一遍
         String today = WeekMath.todayDateLabel();
         if (!today.equals(lastShownDay)) {
             lastShownDay = today;
-            Prefs.setCurrentWeek(this, actualCurrentWeek());
+            int actual = actualCurrentWeek();
+            if (Prefs.currentWeek(this) != actual) {
+                Prefs.setCurrentWeek(this, actual);
+                refreshTimetableTab();
+            }
         }
-        showTab(TAB_TIMETABLE);
         skipNextResumeRefresh = true;
         if (ThemeReveal.restoreTab >= 0) {
             int tab = ThemeReveal.restoreTab, page = ThemeReveal.restorePage;
             ThemeReveal.restoreTab = -1;
             ThemeReveal.restorePage = -1;
             showTab(tab);
-            if (tab == TAB_SETTINGS && page > 0 && page != R.id.settings_page_root) settings.showPage(page);
+            if (tab == TAB_SETTINGS && page > 0 && page != R.id.settings_page_root) settings.showPage(page, false);
         }
         ThemeReveal.play(this);
         // 图标选择和组件状态对不上时（备份恢复到新手机等）补一下；正常启动什么都不做
@@ -119,6 +123,10 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
         if (launch != null && (launch.getData() != null || launch.hasExtra(AppActions.EXTRA_ACTION))) {
             container.post(() -> handleExternalIntent(launch));
         }
+    }
+
+    void refreshDockBlur() {
+        if (dockBlur != null) dockBlur.markDirty();
     }
 
     /**

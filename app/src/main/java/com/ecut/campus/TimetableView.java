@@ -448,6 +448,7 @@ public class TimetableView extends View {
             bgPaint.setColor(G.CARD);
             canvas.drawRect(0, 0, w, h, bgPaint);
         }
+        todayDayOfWeek = WeekMath.todayDayOfWeek();
         nowMinutes = nowMinutesOfDay();
 
         int direction = dragDx < 0 ? 1 : (dragDx > 0 ? -1 : 0);
@@ -518,7 +519,7 @@ public class TimetableView extends View {
 
     private boolean isViewingRealCurrentWeek() {
         if (semesterStartDate == null || semesterStartDate.isEmpty()) return false;
-        return currentWeek == WeekMath.currentWeek(semesterStartDate, 30);
+        return currentWeek == WeekMath.currentWeek(semesterStartDate, totalWeeks);
     }
 
     private void drawWeekHeader(Canvas canvas, float colWidth, int w) {

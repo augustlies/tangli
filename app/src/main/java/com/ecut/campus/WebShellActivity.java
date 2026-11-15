@@ -25,7 +25,6 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.button.MaterialButton;
-import com.google.android.material.color.DynamicColors;
 import com.ecut.campus.data.Grades;
 import com.ecut.campus.data.GradesStore;
 import com.ecut.campus.data.JwglxtFetcher;
@@ -95,7 +94,6 @@ public class WebShellActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
-        DynamicColors.applyToActivityIfAvailable(this);
         super.onCreate(savedInstanceState);
         G.init(this);
         setContentView(R.layout.activity_web);

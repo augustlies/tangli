@@ -61,12 +61,18 @@ public final class CourseExtras {
     /** 往 host 里填内容并显示；course 为空（新建课程）时保持隐藏。 */
     public static void attach(Activity a, LinearLayout host, Timetable t, Timetable.Course course,
                               int sessionIndex, int viewedWeek) {
+        Timetable.Session s = course != null && sessionIndex >= 0 && sessionIndex < course.sessions.size()
+                ? course.sessions.get(sessionIndex)
+                : (course != null && !course.sessions.isEmpty() ? course.sessions.get(0) : null);
+        attach(a, host, t, course, s, viewedWeek);
+    }
+
+    /** 往 host 里填内容并显示；course 为空（新建课程）时保持隐藏；支持传入编辑中的临时 session。 */
+    public static void attach(Activity a, LinearLayout host, Timetable t, Timetable.Course course,
+                              Timetable.Session s, int viewedWeek) {
         if (host == null || course == null || t == null) return;
         host.removeAllViews();
         CourseExtras x = new CourseExtras(a, t, course, viewedWeek);
-        Timetable.Session s = sessionIndex >= 0 && sessionIndex < course.sessions.size()
-                ? course.sessions.get(sessionIndex)
-                : (course.sessions.isEmpty() ? null : course.sessions.get(0));
         View rain = x.rainBlock(s);
         if (rain != null) host.addView(rain, block(a));
         View price = x.priceBlock(s);

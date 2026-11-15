@@ -101,8 +101,6 @@ public class CourseEditActivity extends AppCompatActivity {
         bindViews();
         prepareDraft(sessionIndex);
         renderAll();
-        com.ecut.campus.fun.CourseExtras.attach(this, findViewById(R.id.course_extras),
-                timetable, editingCourse, selectedSessionIndex, currentWeek);
 
         findViewById(R.id.btn_course_back).setOnClickListener(v -> confirmExit());
         findViewById(R.id.btn_course_save).setOnClickListener(v -> save());
@@ -258,8 +256,6 @@ public class CourseEditActivity extends AppCompatActivity {
                 selectedSessionIndex = idx;
                 renderSessionChips();
                 loadSessionIntoForm();
-                com.ecut.campus.fun.CourseExtras.attach(this, findViewById(R.id.course_extras),
-                        timetable, editingCourse, selectedSessionIndex, currentWeek);
             });
             sessionChipRow.addView(chip);
         }
@@ -291,6 +287,8 @@ public class CourseEditActivity extends AppCompatActivity {
         renderWeekModeSelector();
         renderWeekChips();
         updateWeeksPreview();
+        com.ecut.campus.fun.CourseExtras.attach(this, findViewById(R.id.course_extras),
+                timetable, editingCourse, currentSession(), currentWeek);
         loadingForm = false;
     }
 
@@ -691,6 +689,10 @@ public class CourseEditActivity extends AppCompatActivity {
         String name = etName.getText().toString().trim();
         if (name.isEmpty()) {
             Toast.makeText(this, "请填写课程名称", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (customTime && Timetable.Session.minutesOf(timeEnd) <= Timetable.Session.minutesOf(timeStart)) {
+            Toast.makeText(this, "结束时间要晚于开始时间", Toast.LENGTH_SHORT).show();
             return;
         }
         saveFormIntoSession();
