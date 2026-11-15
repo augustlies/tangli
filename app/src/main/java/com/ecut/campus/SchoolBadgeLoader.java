@@ -115,6 +115,7 @@ public final class SchoolBadgeLoader {
                 if (code != 200) return null;
                 String finalUrl = c.getURL().toString();
                 byte[] b = read(c.getInputStream(), 512 * 1024);
+                if (b == null) return null;
                 return new String[]{finalUrl, new String(b, StandardCharsets.UTF_8)};
             } catch (Exception e) {
                 return null;
@@ -126,16 +127,28 @@ public final class SchoolBadgeLoader {
     }
 
     private static byte[] getBytes(String url, int limit) {
-        HttpURLConnection c = null;
-        try {
-            c = open(url);
-            if (c.getResponseCode() != 200) return null;
-            return read(c.getInputStream(), limit);
-        } catch (Exception e) {
-            return null;
-        } finally {
-            if (c != null) c.disconnect();
+        String cur = url;
+        for (int i = 0; i < 5; i++) {
+            HttpURLConnection c = null;
+            try {
+                c = open(cur);
+                int code = c.getResponseCode();
+                if (code >= 300 && code < 400) {
+                    String loc = c.getHeaderField("Location");
+                    if (loc == null) return null;
+                    cur = new URL(new URL(cur), loc).toString();
+                    if (!cur.startsWith("http://") && !cur.startsWith("https://")) return null;
+                    continue;
+                }
+                if (code != 200) return null;
+                return read(c.getInputStream(), limit);
+            } catch (Exception e) {
+                return null;
+            } finally {
+                if (c != null) c.disconnect();
+            }
         }
+        return null;
     }
 
     private static HttpURLConnection open(String url) throws Exception {
@@ -154,7 +167,7 @@ public final class SchoolBadgeLoader {
             int n;
             while ((n = is.read(buf)) > 0) {
                 out.write(buf, 0, n);
-                if (out.size() > limit) break;
+                if (out.size() > limit) return null;
             }
             return out.toByteArray();
         }

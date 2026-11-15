@@ -28,12 +28,12 @@ import com.ecut.campus.data.Timetable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -87,7 +87,13 @@ public final class RainWeather {
             try {
                 File f = cacheFile(ctx);
                 if (!f.isFile()) return null;
-                String raw = new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                try (FileInputStream in = new FileInputStream(f)) {
+                    byte[] buf = new byte[4096];
+                    int n;
+                    while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                }
+                String raw = new String(out.toByteArray(), StandardCharsets.UTF_8);
                 rf = RainForecast.parse(raw, fetchedAt);
                 memoryCache = rf;
                 memoryLoadedAt = fetchedAt;
@@ -218,6 +224,7 @@ public final class RainWeather {
         void onLocation(@Nullable double[] latLon);
     }
 
+    @android.annotation.SuppressLint("MissingPermission")
     @Nullable
     private static double[] lastKnownOrSavedLocation(Context app) {
         if (!hasPermission(app)) return null;
@@ -227,8 +234,7 @@ public final class RainWeather {
                 Location best = null;
                 String[] providers = {
                         LocationManager.NETWORK_PROVIDER,
-                        LocationManager.PASSIVE_PROVIDER,
-                        LocationManager.GPS_PROVIDER
+                        LocationManager.PASSIVE_PROVIDER
                 };
                 for (String p : providers) {
                     try {
@@ -240,7 +246,8 @@ public final class RainWeather {
                     }
                 }
                 if (best != null) {
-                    double lat = best.getLatitude(), lon = best.getLongitude();
+                    double lat = Math.round(best.getLatitude() * 100.0) / 100.0;
+                    double lon = Math.round(best.getLongitude() * 100.0) / 100.0;
                     Prefs.setRainLocation(app, lat, lon);
                     return new double[]{lat, lon};
                 }
@@ -250,6 +257,7 @@ public final class RainWeather {
         return Prefs.rainLocation(app);
     }
 
+    @android.annotation.SuppressLint("MissingPermission")
     private static void resolveLocation(Context app, LocationCallback cb) {
         double[] known = lastKnownOrSavedLocation(app);
         if (known != null) {
@@ -291,7 +299,8 @@ public final class RainWeather {
                     if (!done.compareAndSet(false, true)) return;
                     try { lm.removeUpdates(this); } catch (Throwable ignored) {}
                     if (location != null) {
-                        double lat = location.getLatitude(), lon = location.getLongitude();
+                        double lat = Math.round(location.getLatitude() * 100.0) / 100.0;
+                        double lon = Math.round(location.getLongitude() * 100.0) / 100.0;
                         Prefs.setRainLocation(app, lat, lon);
                         cb.onLocation(new double[]{lat, lon});
                     } else {

@@ -61,7 +61,7 @@ public final class ClassReminder {
             List<DayPlan.Item> items = ClassPlans.day(x, ymd);
             for (DayPlan.Item it : items) {
                 long start = ClassPlans.at(mid, it.startMin);
-                if (start - lead <= now - 30_000L) continue;
+                if (start - lead <= now) continue;
                 Intent i = new Intent(c, Receiver.class);
                 i.putExtra(EX_START, start);
                 i.putExtra(EX_END, ClassPlans.at(mid, it.endMin));

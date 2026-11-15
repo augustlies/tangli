@@ -51,13 +51,14 @@ public class GradeCheckWorker extends Worker {
             return Result.success();
         }
         CountDownLatch done = new CountDownLatch(1);
-        final WebView[] holder = new WebView[1];
+        final CampusSyncClient[] client = new CampusSyncClient[1];
+        final java.util.concurrent.atomic.AtomicBoolean aborted = new java.util.concurrent.atomic.AtomicBoolean(false);
         Handler main = new Handler(Looper.getMainLooper());
         main.post(() -> {
+            if (aborted.get()) return;
             try {
                 WebView view = new WebView(ctx);
-                holder[0] = view;
-                CampusSyncClient.start(view, CampusSyncClient.Kind.GRADES, new CampusSyncClient.Callback() {
+                client[0] = CampusSyncClient.start(view, CampusSyncClient.Kind.GRADES, new CampusSyncClient.Callback() {
                     @Override public void onSuccess(int count) { done.countDown(); }
                     @Override public void onFailure(String message) { done.countDown(); }
                 });
@@ -68,6 +69,11 @@ public class GradeCheckWorker extends Worker {
         try {
             done.await(90, TimeUnit.SECONDS);
         } catch (InterruptedException ignored) {
+        } finally {
+            aborted.set(true);
+            main.post(() -> {
+                if (client[0] != null) client[0].cancel();
+            });
         }
         return Result.success();
     }

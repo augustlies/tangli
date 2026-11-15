@@ -99,9 +99,10 @@ public final class Updater {
         if (!Prefs.updateAutoCheck(a)) return;
         long now = System.currentTimeMillis();
         if (now - Prefs.updateCheckedAt(a) < AUTO_INTERVAL) return;
-        Prefs.setUpdateCheckedAt(a, now);
         fetchLatest(r -> {
-            if (a.isFinishing() || !isNewer(r)) return;
+            if (r == null) return;
+            Prefs.setUpdateCheckedAt(a.getApplicationContext(), System.currentTimeMillis());
+            if (a.isFinishing() || a.isDestroyed() || !isNewer(r)) return;
             if (r.tag.equals(Prefs.updateSkippedTag(a))) return;
             showDialog(a, r, true);
         });

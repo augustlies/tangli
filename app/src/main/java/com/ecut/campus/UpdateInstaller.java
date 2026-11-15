@@ -139,22 +139,24 @@ public final class UpdateInstaller {
                     err = verify(a, part, r);
                     if (err == null && part.renameTo(done)) {
                         main.post(() -> {
+                            if (a.isFinishing() || a.isDestroyed()) return;
                             if (dlg.isShowing()) dlg.dismiss();
-                            if (!a.isFinishing()) install(a, done, r);
+                            install(a, done, r);
                         });
                         return;
                     }
                     if (err == null) err = "保存失败";
                 }
                 part.delete();
+                if (cancelled[0]) return;
                 lastErr = s.label + "：" + err;
                 DiagLog.log(a, "update", "下载失败 " + lastErr);
             }
             if (cancelled[0]) return;
             final String fe = lastErr;
             main.post(() -> {
+                if (a.isFinishing() || a.isDestroyed()) return;
                 if (dlg.isShowing()) dlg.dismiss();
-                if (a.isFinishing()) return;
                 new AlertDialog.Builder(a)
                         .setTitle("没下载成功")
                         .setMessage((fe.isEmpty() ? "" : fe + "\n\n") + "可以去发布页用浏览器下载。")
@@ -173,13 +175,14 @@ public final class UpdateInstaller {
         HttpURLConnection c = null;
         try {
             String url = s.url;
+            int code = -1;
             for (int hop = 0; hop < 6; hop++) { // 手动跟随跳转（GitHub → 存储域名）
                 c = (HttpURLConnection) new URL(url).openConnection();
                 c.setInstanceFollowRedirects(false);
                 c.setConnectTimeout(8000);
                 c.setReadTimeout(15000);
                 c.setRequestProperty("User-Agent", "tangli-android");
-                int code = c.getResponseCode();
+                code = c.getResponseCode();
                 if (code / 100 == 3) {
                     String loc = c.getHeaderField("Location");
                     c.disconnect();
@@ -191,6 +194,7 @@ public final class UpdateInstaller {
                 if (code != 200) return "HTTP " + code;
                 break;
             }
+            if (code != 200) return "跳转次数过多";
             long total = c.getContentLengthLong();
             if (total <= 0) total = expectSize;
             if (expectSize > 0 && total > 0 && total != expectSize) return "文件大小不对";

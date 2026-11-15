@@ -144,6 +144,14 @@ final class SettingsTab {
                         ScheduleSettingsStore.clear(a);
                         Prefs.setLastSyncTime(a, "");
                         Prefs.setGradesDemo(a, false);
+                        Prefs.setNewGradeKeys(a, java.util.Collections.emptySet());
+                        Prefs.setSemesterStartDate(a, "");
+                        Prefs.setCurrentWeek(a, 1);
+                        androidx.core.app.NotificationManagerCompat.from(a).cancel(2001);
+                        ClassWidget.updateAll(a.getApplicationContext());
+                        ClassReminder.reschedule(a.getApplicationContext());
+                        NextClassNotice.update(a.getApplicationContext());
+                        a.refreshTimetableTab();
                         refresh();
                         Toast.makeText(a, "本地数据已清空", Toast.LENGTH_SHORT).show();
                     })
@@ -374,16 +382,14 @@ final class SettingsTab {
         index.setVisibility(View.VISIBLE);
         final String schoolId = school.id;
         SchoolBadgeLoader.ensure(a, school, b -> {
-            if (a.isFinishing() || settingsFragment == null) return;
+            if (a.isFinishing() || a.isDestroyed() || settingsFragment == null) return;
             if (!schoolId.equals(Schools.current(a).id)) return;
-            android.widget.ImageView iv = settingsFragment.findViewById(R.id.iv_settings_school_badge);
-            TextView tv = settingsFragment.findViewById(R.id.tv_settings_school_index);
-            if (iv == null || tv == null) return;
-            iv.setImageBitmap(b);
-            iv.setAlpha(0f);
-            iv.setVisibility(View.VISIBLE);
-            iv.animate().alpha(1f).setDuration(220).start();
-            tv.setVisibility(View.INVISIBLE);
+            if (badge == null || index == null) return;
+            badge.setImageBitmap(b);
+            badge.setAlpha(0f);
+            badge.setVisibility(View.VISIBLE);
+            badge.animate().alpha(1f).setDuration(220).start();
+            index.setVisibility(View.INVISIBLE);
         });
     }
 

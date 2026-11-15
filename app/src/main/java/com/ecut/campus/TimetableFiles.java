@@ -87,13 +87,24 @@ final class TimetableFiles {
 
     /** 导出当前学期课表为 ICS 并弹出系统分享。 */
     static void exportIcs(Activity a, Timetable t, ScheduleSettings schedule) {
-        String start = t.semester.startDate;
+        if (t == null || t.semester == null) {
+            Toast.makeText(a, "暂无可导出的课表", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String start = WeekMath.effectiveStart(t.semester.startDate, t.semester.id, Schools.current(a).isEcut());
         if (start == null || start.isEmpty()) {
             Toast.makeText(a, "先在「课表设置」里设置第一周日期，才能导出日历", Toast.LENGTH_LONG).show();
             return;
         }
         String label = t.semester.name + " · 烫梨课表";
-        String ics = IcsExporter.export(t, schedule, label);
+        String origStart = t.semester.startDate;
+        String ics;
+        try {
+            t.semester.startDate = start;
+            ics = IcsExporter.export(t, schedule, label);
+        } finally {
+            t.semester.startDate = origStart;
+        }
         if (ics == null || ics.isEmpty()) {
             Toast.makeText(a, "导出失败：课表为空或日期无效", Toast.LENGTH_SHORT).show();
             return;
