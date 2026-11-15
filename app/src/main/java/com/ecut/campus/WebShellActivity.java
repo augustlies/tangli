@@ -878,11 +878,11 @@ public class WebShellActivity extends AppCompatActivity {
 
     /**
      * 办事大厅是异步渲染的 SPA，首次打开时卡片往往还没出现。
-     * 轮询查找“学生课表查询(新)”并点击其可交互父节点，让办事大厅自己完成
+     * 轮询查找“学生课表查询”（兼容“(新)”后缀）并点击其可交互父节点，让办事大厅自己完成
      * 统一身份认证与 aTrust 代理跳转，避免绕过统一登录直接打开教务登录页。
      */
     private void openTimetableFromEhall(WebView view) {
-        openEhallTarget(view, "学生课表查询(新)");
+        openEhallTarget(view, "学生课表查询");
     }
 
     private void rememberEhallSession(WebView view, boolean openTimetable) {
@@ -912,16 +912,19 @@ public class WebShellActivity extends AppCompatActivity {
         String js = "(function(){" +
                 "if(window.__tangliTimetableOpening)return 'ALREADY';" +
                 "var target=" + jsQuote(target) + ";" +
+                "function matchesTarget(t){" +
+                "return t===target||t===target+'(新)'||(t.indexOf(target)>=0&&t.length<=target.length+6);" +
+                "}" +
                 "function pick(){" +
                 "var all=document.querySelectorAll('body *');" +
                 "for(var i=0;i<all.length;i++){" +
                 "var el=all[i];" +
                 "if(el.children.length>0)continue;" +
                 "var text=(el.innerText||el.textContent||'').replace(/\\s+/g,'').trim();" +
-                "if(text!==target)continue;" +
+                "if(!matchesTarget(text))continue;" +
                 "var node=el;" +
                 "for(var n=0;n<7&&node;n++,node=node.parentElement){" +
-                "if(node.matches&&node.matches('a,button,[onclick],[role=button],.amp-app-item,.amp-app-card')){" +
+                "if(node.matches&&node.matches('a,button,[onclick],[role=button],.amp-app-item,.amp-app-card,.appFlag')){" +
                 "window.__tangliTimetableOpening=true;node.click();return 'CLICKED';" +
                 "}" +
                 "var style=getComputedStyle(node);" +

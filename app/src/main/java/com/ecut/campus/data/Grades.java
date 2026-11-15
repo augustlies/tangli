@@ -284,7 +284,7 @@ public final class Grades {
      *   [9] 成绩性质 (正常考试)
      *   [11] 开课学院
      *   [12] 课程标记 (主修)
-     *   [16/17] 教师
+     *   [16] 教师（[17] 为考核方式；列偏移时回退 [17]）
      *   [22] 成绩（或当列偏移时回退检测）
      */
     public static Grades parseFromDomRows(String rowsJson) {
@@ -334,9 +334,9 @@ public final class Grades {
                 cg.college = JwglxtFetcher.clean(r.optString(11, ""));
                 cg.category = JwglxtFetcher.clean(r.optString(12, ""));
 
-                String c17 = JwglxtFetcher.clean(r.optString(17, ""));
                 String c16 = JwglxtFetcher.clean(r.optString(16, ""));
-                cg.teacher = !c17.isEmpty() ? c17 : (!c16.contains("-") ? c16 : "");
+                String c17 = JwglxtFetcher.clean(r.optString(17, ""));
+                cg.teacher = pickTeacher(c16, c17);
 
                 String scoreStr = JwglxtFetcher.clean(r.optString(22, ""));
                 if (scoreStr.isEmpty()) {
@@ -385,6 +385,18 @@ public final class Grades {
     private static Double estimateGradePoint(double score) {
         if (score < 60.0) return 0.0;
         return round2(Math.min(5.0, Math.max(1.0, (score - 50.0) / 10.0)));
+    }
+
+    private static String pickTeacher(String c16, String c17) {
+        if (isValidTeacherCell(c16)) return c16;
+        if (isValidTeacherCell(c17)) return c17;
+        return "";
+    }
+
+    private static boolean isValidTeacherCell(String s) {
+        if (s == null || s.isEmpty() || "无".equals(s)) return false;
+        if (s.contains("-")) return false;
+        return !"考试".equals(s) && !"考查".equals(s) && !"考察".equals(s);
     }
 
     static double round2(double v) {

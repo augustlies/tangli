@@ -22,10 +22,21 @@ public final class DemoGrades {
 
     public static boolean isDemo(Grades.CourseGrade c) {
         if (c == null || c.code == null || c.name == null) return false;
+        if (hasRealOrigin(c)) return false;
         for (String[] d : DEMO) {
             if (d[0].equals(c.code) && d[1].equals(c.name)) return true;
         }
         return false;
+    }
+
+    /** 区分真实同步课程与旧演示样本，避免误删同代码同名的真实课程。 */
+    private static boolean hasRealOrigin(Grades.CourseGrade c) {
+        String t = c.teacher == null ? "" : c.teacher.trim();
+        if (!t.isEmpty() && !t.startsWith("教师") && !"无".equals(t)) {
+            return true;
+        }
+        String col = c.college == null ? "" : c.college.trim();
+        return !col.isEmpty() && !col.equals("地球与行星科学学院");
     }
 
     /** 剔除演示成绩，返回删掉的门数；删空的学期一并去掉。 */

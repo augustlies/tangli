@@ -36,4 +36,29 @@ public class DemoGradesTest {
         assertEquals(2, g.semesters.get(0).courses.size());
         assertEquals(0, DemoGrades.strip(g));
     }
+
+    @Test
+    public void keepsRealSyncedCoursesWithSameCodeAndName() {
+        Grades g = new Grades();
+        Grades.SemesterGrades real = new Grades.SemesterGrades();
+        real.id = "2024-2025-1";
+
+        Grades.CourseGrade c1 = c("DK1101ZB", "专业导论");
+        c1.teacher = "王老师";
+        c1.college = "地球与行星科学学院（演示全称）";
+
+        Grades.CourseGrade c2 = c("DK7002ZW", "普通地质学");
+        c2.teacher = "李教授";
+        c2.college = "地球与行星科学学院（演示全称）";
+
+        Grades.CourseGrade legacyDemo = c("DK1101ZB", "专业导论");
+
+        real.courses.add(c1);
+        real.courses.add(c2);
+        real.courses.add(legacyDemo);
+        g.semesters.add(real);
+
+        assertEquals(1, DemoGrades.strip(g));
+        assertEquals(2, g.totalCourseCount());
+    }
 }

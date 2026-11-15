@@ -27,7 +27,7 @@ public final class ScheduleSettings {
             45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45
     };
     private static final int[] DEFAULT_BREAKS = {
-            10, 20, 10, 140, 10, 20, 10, 80, 10, 10, 10, 10, 10, 10, 10, 0
+            10, 20, 10, 140, 10, 20, 10, 80, 10, 20, 10, 10, 10, 10, 10, 0
     };
 
     public static final class Section {

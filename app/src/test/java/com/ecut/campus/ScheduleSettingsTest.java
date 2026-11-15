@@ -37,6 +37,10 @@ public class ScheduleSettingsTest {
         assertEquals("19:45", s.endTime(9));
         assertEquals("19:55", s.startTime(10));
         assertEquals("20:40", s.endTime(10));
+        assertEquals("21:00", s.startTime(11));
+        assertEquals("21:45", s.endTime(11));
+        assertEquals("21:55", s.startTime(12));
+        assertEquals("22:40", s.endTime(12));
 
         for (int section = 1; section <= s.sectionCount(); section++) {
             assertEquals("第 " + section + " 节应为 45 分钟",

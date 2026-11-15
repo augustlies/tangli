@@ -101,4 +101,26 @@ public class GradesTest {
         assertEquals(2, remote.totalCourseCount());
         assertEquals("专业导论", remote.semesters.get(0).courses.get(0).name);
     }
+
+    @Test
+    public void parseFromDomRows_examMethodInCol17AndRetakeTeacherWu() {
+        String rows = "{\"rows\":["
+                + "[\"查看\",\"2024-2025\",\"1\",\"LX5016ZW\",\"高等数学（BI）\",\"必修\",\"4.0\",\"\",\"1.60\",\"正常考试\",\"否\",\"理学院\",\"主修\",\"本科\",\"公共理论课A\",\"高等数学-0001\",\"教师A\",\"考试\",\"2024000000\",\"张三\",\"\",\"\",\"66\",\"否\"],"
+                + "[\"查看\",\"2025-2026\",\"1\",\"CH1088ZB\",\"测量学\",\"必修\",\"2.0\",\"\",\"3.40\",\"补考一\",\"否\",\"测绘学院\",\"主修\",\"\",\"\",\"测量学CH1088ZB\",\"无\",\"考查\",\"2024000000\",\"张三\",\"\",\"\",\"84\",\"否\"],"
+                + "[\"查看\",\"2024-2025\",\"2\",\"DK0001ZB\",\"岩石学\",\"必修\",\"3.0\",\"\",\"2.80\",\"正常考试\",\"否\",\"地学院\",\"主修\",\"\",\"\",\"地学院\",\"岩石学-0001\",\"教师B\",\"2024000000\",\"张三\",\"\",\"\",\"78\",\"否\"]"
+                + "]}";
+        Grades g = Grades.parseFromDomRows(rows);
+        assertEquals(3, g.totalCourseCount());
+
+        // 2025-2026-1 排在前（降序）
+        Grades.CourseGrade retake = g.semesters.get(0).courses.get(0);
+        assertEquals("补考一", retake.examType);
+        assertEquals("", retake.teacher);
+
+        Grades.CourseGrade shifted = g.semesters.get(1).courses.get(0);
+        assertEquals("教师B", shifted.teacher);
+
+        Grades.CourseGrade math = g.semesters.get(2).courses.get(0);
+        assertEquals("教师A", math.teacher);
+    }
 }
