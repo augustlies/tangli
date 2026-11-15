@@ -1,0 +1,58 @@
+name: 学校教务适配申请
+description: 申请适配新的学校或教务系统
+title: "[适配] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        欢迎提交新学校适配请求！请配合填写以下信息，并务必去除个人隐私数据（参考 `CONTRIBUTING.md`）。
+
+  - type: input
+    id: school_name
+    attributes:
+      label: 学校全称与域名后缀
+      description: 例如：XX大学（xxu.edu.cn）
+      placeholder: "例如：XX大学（xxu.edu.cn）"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: vendor
+    attributes:
+      label: 教务系统类型
+      options:
+        - 正方教务（jwglxt）
+        - 强智教务（jsxsd）
+        - 金智教务（wisedu）
+        - URP 综合教务
+        - 青果教务（kingosoft）
+        - 树维教务（supwisdom）
+        - 其他或不确定
+    validations:
+      required: true
+
+  - type: input
+    id: portal_url
+    attributes:
+      label: 课表/成绩页 URL 或统一门户地址
+      description: 如有 `gnmkdm` 等必要查询参数，请一并贴出（去除敏感参数）
+      placeholder: "https://jwxt.example.edu.cn/..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: sample
+    attributes:
+      label: 脱敏后的接口 JSON 或页面 HTML 片段
+      description: 请粘贴用于分析结构的课表/成绩接口响应 JSON 或页面 HTML 片段（务必先替换真实姓名与学号）
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: 隐私与脱敏确认
+      options:
+        - label: 我已确认移除真实姓名、学号、密码、Cookie 与 Token 等敏感信息
+          required: true

@@ -18,7 +18,7 @@ public class IcsExporterTest {
         t.semester.totalWeeks = 20;
         Timetable.Course c = new Timetable.Course();
         c.name = "矿床学";
-        c.teacher = "戴朝成";
+        c.teacher = "教师A";
         Timetable.Session s = new Timetable.Session();
         s.dayOfWeek = 2; // 周二
         s.startSection = 1;
@@ -46,7 +46,7 @@ public class IcsExporterTest {
         assertTrue(ics.contains("DTEND;TZID=Asia/Shanghai:20260908T094000"));
         assertTrue(ics.contains("SUMMARY:矿床学"));
         assertTrue(ics.contains("LOCATION:4-620"));
-        assertTrue(ics.contains("DESCRIPTION:戴朝成"));
+        assertTrue(ics.contains("DESCRIPTION:教师A"));
     }
 
     @Test

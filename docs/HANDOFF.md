@@ -33,7 +33,7 @@
 | DNS 广告过滤 | ✅ 真机跑通 | logcat 记录 25+ 广告域被 BLOCK，规则 54 block / 82 observe / 190 allow |
 | 教务直达（课表/成绩/选课） | ✅ 真机跑通 | 1.6 秒直达，`direct ok` 日志 |
 | Material You 界面（4 个页面） | ✅ 已装真机 | 截图验证 |
-| **课表数据层（`com.ecut.campus.data`）** | ✅ 已接入 UI | 单元测试全绿（当前全套 96 个） |
+| **课表数据层（`com.ecut.campus.data`）** | ✅ 已接入 UI | 单元测试全绿（当前全套 319 个 / 47 个套件） |
 | **统一门户静默同步（课表/成绩）** | ✅ 真机验证 | 课表 6 门 / 14 条；成绩 57 条 / 4 学期，全程停留 App |
 
 ### 未完成（下一步）
@@ -67,7 +67,7 @@ export PATH="$JAVA_HOME/bin:$PATH"
 # 编译
 "<你的 Gradle 8.4 路径>/bin/gradle" assembleRelease --console=plain
 
-# 跑测试（96 个）
+# 跑测试（319 个）
 "<你的 Gradle 8.4 路径>/bin/gradle" testReleaseUnitTest --console=plain
 
 # 装到手机
@@ -246,11 +246,14 @@ app/src/main/java/com/ecut/campus/
     ├── Timetable.java         (238)  课程/时段模型 + JSON 序列化
     ├── WeekRange.java         (187)  周次表达式解析
     ├── JwglxtFetcher.java     (233)  kbList 解析 + 按 jxb_id 聚合
+    ├── ZhengfangSource.java          正方教务入口（委托 JwglxtFetcher.parse）
+    ├── TimetableSources.java         多校来源分发（强智 / 强智H5 / 金智 / Calendar 等）
     └── TimetableStore.java    (162)  本地原子写 + 同步合并
 
 app/src/test/java/com/ecut/campus/data/
-├── WeekRangeTest.java         (193)  23 个测试
-└── JwglxtFetcherTest.java     (270)  22 个测试
+├── WeekRangeTest.java                周次表达式测试
+├── JwglxtFetcherTest.java            正方课表解析测试
+└── ...                               多校解析、ICS 导出、指令与存档等单测（共 47 套件 / 319 个用例）
 
 app/src/test/resources/fixtures/
 ├── jwglxt_kb_sample.json             14 条课表样本（已脱敏）
