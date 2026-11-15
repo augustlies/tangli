@@ -180,6 +180,7 @@ public final class QiangzhiH5Source implements TimetableSource {
             ss.location = s.location;
             ss.teacher = s.teacher;
             ss.timeStart = s.timeStart;
+            ss.timeEnd = s.timeEnd;
             c.sessions.add(ss);
         }
         List<Timetable.Course> courses = new ArrayList<>(grouped.values());
@@ -192,7 +193,7 @@ public final class QiangzhiH5Source implements TimetableSource {
     }
 
     private static final class Slot {
-        String name, teacher, location, weeksRaw, timeStart;
+        String name, teacher, location, weeksRaw, timeStart, timeEnd;
         int day, start, end;
         TreeSet<Integer> weeks = new TreeSet<>();
     }
@@ -216,6 +217,9 @@ public final class QiangzhiH5Source implements TimetableSource {
             s.end = t[2];
             s.weeksRaw = "";
             s.timeStart = it.optString("startTime", "").trim();
+            String end = it.optString("endTime", "").trim();
+            if (end.isEmpty()) end = it.optString("endTIme", "").trim();
+            s.timeEnd = end;
             slots.put(key, s);
         }
         List<Integer> ws = weekList(it.optString("classWeekDetails", ""));

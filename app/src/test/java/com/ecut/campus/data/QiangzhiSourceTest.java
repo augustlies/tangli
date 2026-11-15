@@ -116,6 +116,7 @@ public class QiangzhiSourceTest {
         assertArrayEquals(new int[]{1, 4}, QiangzhiSource.sectionsFrom("01-02-03-04节"));
         assertArrayEquals(new int[]{9, 11}, QiangzhiSource.sectionsFrom("9-11节"));
         assertArrayEquals(new int[]{1, 2}, QiangzhiSource.rowLabelSections("第一大节 0102", 1));
+        assertArrayEquals(new int[]{1, 2}, QiangzhiSource.rowLabelSections("第一大节 08:00-10:10", 1));
         assertArrayEquals(new int[]{3, 4}, QiangzhiSource.rowLabelSections("第二大节(03,04小节)", 2));
         assertArrayEquals(new int[]{5, 6}, QiangzhiSource.rowLabelSections("第三大节", 9));
         assertArrayEquals(new int[]{7, 8}, QiangzhiSource.rowLabelSections("", 4));
@@ -123,6 +124,26 @@ public class QiangzhiSourceTest {
         assertEquals(0, QiangzhiSource.dayFromId("kb"));
         assertEquals(7, QiangzhiSource.dayFromText("星期日"));
         assertEquals(1, QiangzhiSource.dayFromText("周一"));
+    }
+
+    @Test
+    public void fallsBackToWeekdayTableWhenKbtableMissing() {
+        String html = "<html><body>"
+                + "<table><tr><td>查询条件</td><td><select><option>2026-2027-1</option></select></td></tr></table>"
+                + "<table><tr><th>节次</th><th>星期一</th><th>星期二</th></tr>"
+                + "<tr><th>第一大节 08:00-09:40</th>"
+                + "<td><div class=\"kbcontent\">高等数学<br><font title=\"老师\">张三</font><br>"
+                + "<font title=\"周次(节次)\">1-16(周)</font><br><font title=\"教室\">A101</font></div></td>"
+                + "<td></td></tr></table>"
+                + "</body></html>";
+        JwglxtFetcher.Result r = QiangzhiSource.parseHtml(html);
+        assertTrue(r.warnings.toString(), r.ok());
+        assertEquals(1, r.courseCount);
+        Timetable.Session s = r.timetable.courses.get(0).sessions.get(0);
+        assertEquals(1, s.dayOfWeek);
+        assertEquals(1, s.startSection);
+        assertEquals(2, s.endSection);
+        assertEquals("A101", s.location);
     }
 
     @Test

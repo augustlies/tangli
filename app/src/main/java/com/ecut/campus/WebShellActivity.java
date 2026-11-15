@@ -349,25 +349,30 @@ public class WebShellActivity extends AppCompatActivity {
                                           boolean isUserGesture, Message resultMsg) {
                 // 在同一 WebView 内打开新窗口链接，保证返回键与手机适配生效
                 WebView temp = new WebView(WebShellActivity.this);
+                final boolean[] handled = {false};
                 temp.setWebViewClient(new WebViewClient() {
-                    @Override
-                    public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest req) {
-                        String u = req.getUrl().toString();
+                    private void forwardAndDestroy(WebView v, String rawUrl) {
+                        if (handled[0]) return;
+                        if (rawUrl == null || rawUrl.isEmpty() || "about:blank".equals(rawUrl)) return;
+                        handled[0] = true;
+                        String u = rewriteBareCampusHost(rawUrl);
                         if (isAllowedCampusUrl(u)) {
                             maybeCaptureHost(u);
                             webView.loadUrl(u);
                         }
-                        v.destroy();
+                        v.stopLoading();
+                        v.post(v::destroy);
+                    }
+
+                    @Override
+                    public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest req) {
+                        forwardAndDestroy(v, req.getUrl().toString());
                         return true;
                     }
 
                     @Override
                     public void onPageStarted(WebView v, String u, Bitmap f) {
-                        if (isAllowedCampusUrl(u)) {
-                            maybeCaptureHost(u);
-                            webView.loadUrl(u);
-                        }
-                        v.destroy();
+                        forwardAndDestroy(v, u);
                     }
                 });
                 WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
@@ -379,6 +384,10 @@ public class WebShellActivity extends AppCompatActivity {
             @Override
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> cb,
                                              FileChooserParams params) {
+                if (fileCallback != null) {
+                    fileCallback.onReceiveValue(null);
+                    fileCallback = null;
+                }
                 fileCallback = cb;
                 try {
                     startActivityForResult(params.createIntent(), REQ_FILE);
@@ -434,17 +443,35 @@ public class WebShellActivity extends AppCompatActivity {
             Grades parsed = Grades.parseFromDomRows(decoded);
             int count = parsed.totalCourseCount();
             if (count > 0) {
-                Grades local = GradesStore.load(WebShellActivity.this);
-                Grades merged = GradesStore.merge(local, parsed);
-                if (GradesStore.save(WebShellActivity.this, merged)) {
+                parsed.updatedAt = new SimpleDateFormat(
+                        "yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).format(new Date());
+                parsed.recomputeAll();
+                try {
+                    Grades before = GradesStore.load(WebShellActivity.this);
+                    if (!Prefs.isGradesDemo(WebShellActivity.this)) {
+                        List<Grades.CourseGrade> fresh =
+                                com.ecut.campus.data.GradeDiff.newGrades(before, parsed);
+                        if (!fresh.isEmpty()) {
+                            java.util.Set<String> keys = Prefs.newGradeKeys(WebShellActivity.this);
+                            keys.addAll(com.ecut.campus.data.GradeDiff.newKeys(before, parsed));
+                            Prefs.setNewGradeKeys(WebShellActivity.this, keys);
+                            Notify.newGrades(WebShellActivity.this, fresh);
+                        }
+                    } else {
+                        Prefs.setNewGradeKeys(WebShellActivity.this, java.util.Collections.emptySet());
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "grade diff failed", e);
+                }
+                if (GradesStore.save(WebShellActivity.this, parsed)) {
                     Prefs.setGradesDemo(WebShellActivity.this, false);
                     String now = new SimpleDateFormat("MM-dd HH:mm", Locale.US).format(new Date());
                     Prefs.setLastSyncTime(WebShellActivity.this, now);
-                    Log.i(TAG, "Grades saved: " + merged.totalCourseCount() + " courses");
+                    Log.i(TAG, "Grades saved: " + parsed.totalCourseCount() + " courses");
                     if (!syncedGradesOnce) {
                         syncedGradesOnce = true;
                         Toast.makeText(WebShellActivity.this,
-                                "已同步 " + merged.totalCourseCount() + " 门成绩到本地，离线可秒开",
+                                "已同步 " + parsed.totalCourseCount() + " 门成绩到本地，离线可秒开",
                                 Toast.LENGTH_SHORT).show();
                     }
                 }
@@ -457,12 +484,13 @@ public class WebShellActivity extends AppCompatActivity {
      * 解析 kbList 并合并写入本地 timetable.json。
      */
     private void syncTimetableFromSession(WebView view) {
+        String[] def = ZhengfangSource.defaultTerm(java.util.Calendar.getInstance());
         String js = "(function(){" +
                 "try{" +
                 "var yEl=document.getElementById('xnm');" +
                 "var tEl=document.getElementById('xqm');" +
-                "var xnm=(yEl&&yEl.value)?yEl.value:'2026';" +
-                "var xqm=(tEl&&tEl.value)?tEl.value:'3';" +
+                "var xnm=(yEl&&yEl.value)?yEl.value:'" + def[0] + "';" +
+                "var xqm=(tEl&&tEl.value)?tEl.value:'" + def[1] + "';" +
                 "var xhr=new XMLHttpRequest();" +
                 "xhr.open('POST','/jwglxt/kbcx/xskbcx_cxXsKb.html?gnmkdm=N2151',false);" +
                 "xhr.setRequestHeader('Content-Type','application/x-www-form-urlencoded');" +
@@ -484,8 +512,13 @@ public class WebShellActivity extends AppCompatActivity {
                 Timetable local = TimetableStore.load(WebShellActivity.this);
                 Timetable merged = TimetableStore.merge(local, res.timetable);
                 if (TimetableStore.save(WebShellActivity.this, merged)) {
+                    SemesterArchive.unifyColors(WebShellActivity.this);
                     String now = new SimpleDateFormat("MM-dd HH:mm", Locale.US).format(new Date());
                     Prefs.setLastSyncTime(WebShellActivity.this, now);
+                    Prefs.setTimetableSyncedAt(WebShellActivity.this, System.currentTimeMillis());
+                    ClassWidget.updateAll(getApplicationContext());
+                    ClassReminder.reschedule(getApplicationContext());
+                    NextClassNotice.update(getApplicationContext());
                     Log.i(TAG, "Timetable saved: " + merged.courses.size() + " courses (" + res.rawRecords + " records)");
                     if (!syncedTimetableOnce) {
                         syncedTimetableOnce = true;
@@ -636,6 +669,9 @@ public class WebShellActivity extends AppCompatActivity {
                     Prefs.setTimetableSyncedAt(this, System.currentTimeMillis());
                     Prefs.setPortalSession(this, true);
                     Prefs.setSessionExpired(this, false);
+                    ClassWidget.updateAll(getApplicationContext());
+                    ClassReminder.reschedule(getApplicationContext());
+                    NextClassNotice.update(getApplicationContext());
                     rememberDetectedVendor(src, pageUrl);
                     DiagLog.log(this, "import", "已导入 " + merged.courses.size() + " 门");
                     Toast.makeText(this, "已导入 " + res.courseCount + " 门课", Toast.LENGTH_SHORT).show();
@@ -724,43 +760,6 @@ public class WebShellActivity extends AppCompatActivity {
             }
             return trimmed;
         }
-    }
-
-    /** 诊断：先触发查询，延迟后 dump 课表 DOM */
-    private void dumpTimetableDom(WebView view) {
-        String trigger = "(function(){" +
-                "var btns=document.querySelectorAll('button,a,input[type=button]');" +
-                "for(var i=0;i<btns.length;i++){var t=(btns[i].innerText||btns[i].value||'').trim();" +
-                "if(t==='查询'||t==='查 询'){btns[i].click();return 'CLICKED:'+t;}}" +
-                "return 'NO_BUTTON';})()";
-        view.evaluateJavascript(trigger, r -> {
-            Log.i(TAG, "QUERY_TRIGGER: " + r);
-            view.postDelayed(() -> {
-                String dump = "(function(){" +
-                        "var out={};" +
-                        "var names=['ylkbTable','table1','table2'];" +
-                        "for(var ni=0;ni<names.length;ni++){" +
-                        "var el=document.getElementById(names[ni]);" +
-                        "if(!el){out[names[ni]]='NOT_FOUND';continue;}" +
-                        "var o={tag:el.tagName,cls:(el.className||'').substring(0,50)," +
-                        "childCount:el.children.length,textLen:(el.innerText||'').length};" +
-                        "var tags={};var kids=el.querySelectorAll('*');" +
-                        "for(var i=0;i<kids.length&&i<600;i++){var t=kids[i].tagName;tags[t]=(tags[t]||0)+1;}" +
-                        "o.tagHistogram=tags;" +
-                        "var rs=el.querySelectorAll('td[rowspan],div[rowspan]');" +
-                        "o.rowspanCount=rs.length;" +
-                        "if(rs.length>0){var b=rs[0];" +
-                        "o.firstRowspan={tag:b.tagName,cls:(b.className||'').substring(0,50)," +
-                        "rowspan:b.rowSpan,colspan:b.colSpan," +
-                        "innerHTML:(b.innerHTML||'').substring(0,700)};}" +
-                        "var td=el.querySelector('td');" +
-                        "if(td){o.firstTd={cls:(td.className||'').substring(0,50)," +
-                        "innerHTML:(td.innerHTML||'').substring(0,500)};}" +
-                        "out[names[ni]]=o;}" +
-                        "return JSON.stringify(out);})()";
-                view.evaluateJavascript(dump, v -> Log.i(TAG, "DOM_DUMP: " + v));
-            }, 6000);
-        });
     }
 
     /**

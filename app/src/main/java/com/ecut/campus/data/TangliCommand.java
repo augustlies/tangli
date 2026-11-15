@@ -884,13 +884,19 @@ public final class TangliCommand {
         Matcher m = P_SECTION_RANGE.matcher(body);
         int n = plan.sectionStart.length - 1;
         if (n < 1) throw new CmdError("读不到当前作息");
-        StringBuilder desc = new StringBuilder();
-        boolean any = false, changed = false;
+        java.util.List<int[]> entries = new java.util.ArrayList<>();
         while (m.find()) {
-            any = true;
             int sec = Integer.parseInt(m.group(1));
             int st = Integer.parseInt(m.group(2)) * 60 + Integer.parseInt(m.group(3));
             int en = Integer.parseInt(m.group(4)) * 60 + Integer.parseInt(m.group(5));
+            entries.add(new int[]{sec, st, en});
+        }
+        if (entries.isEmpty()) throw new CmdError("作息要写成 第1节 08:00-08:45");
+        entries.sort((a, b) -> Integer.compare(a[0], b[0]));
+        StringBuilder desc = new StringBuilder();
+        boolean changed = false;
+        for (int[] entry : entries) {
+            int sec = entry[0], st = entry[1], en = entry[2];
             if (sec < 1 || sec > n) throw new CmdError("只有第 1 到第 " + n + " 节");
             if (en <= st || st >= 24 * 60 || en > 24 * 60) throw new CmdError("第" + sec + "节时间不对");
             if (sec > 1 && st < plan.sectionEnd[sec - 1]) {
@@ -915,7 +921,6 @@ public final class TangliCommand {
             if (desc.length() > 0) desc.append("，");
             desc.append("第").append(sec).append("节 ").append(hm(st)).append('-').append(hm(en));
         }
-        if (!any) throw new CmdError("作息要写成 第1节 08:00-08:45");
         it.action = "section";
         it.changed = changed;
         if (changed) plan.sectionsChanged = true;

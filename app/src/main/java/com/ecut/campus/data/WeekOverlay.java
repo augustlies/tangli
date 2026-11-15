@@ -106,6 +106,7 @@ public final class WeekOverlay {
                 }
             }
             if (move && targetWeek(a) == week) {
+                moveSearch:
                 for (Timetable.Course c : t.courses) {
                     if (!c.name.equals(a.name)) continue;
                     for (Timetable.Session s : c.sessions) {
@@ -130,7 +131,7 @@ public final class WeekOverlay {
                         n.weekTeachers.clear();
                         if (wt != null) n.weekTeachers.put(week, wt);
                         o.extras.add(new Extra(c, n, "调课", a.id));
-                        break; // 一条调课只搬一个时段
+                        break moveSearch; // 一条调课只搬一个时段
                     }
                 }
             }

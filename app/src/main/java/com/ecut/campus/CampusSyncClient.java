@@ -443,12 +443,13 @@ public final class CampusSyncClient {
             extractOtherTimetable();
             return;
         }
+        String[] def = com.ecut.campus.data.ZhengfangSource.defaultTerm(java.util.Calendar.getInstance());
         String xnmExpr = targetXnm != null && !targetXnm.isEmpty()
                 ? "'" + targetXnm.replace("'", "") + "'"
-                : "((yEl&&yEl.value)?yEl.value:'2026')";
+                : "((yEl&&yEl.value)?yEl.value:'" + def[0] + "')";
         String xqmExpr = targetXqm != null && !targetXqm.isEmpty()
                 ? "'" + targetXqm.replace("'", "") + "'"
-                : "((tEl&&tEl.value)?tEl.value:'3')";
+                : "((tEl&&tEl.value)?tEl.value:'" + def[1] + "')";
         String js = "(function(){" +
                 "try{" +
                 "var yEl=document.getElementById('xnm');" +
@@ -695,6 +696,8 @@ public final class CampusSyncClient {
                         Prefs.setNewGradeKeys(appContext, keys);
                         Notify.newGrades(appContext, fresh);
                     }
+                } else {
+                    Prefs.setNewGradeKeys(appContext, java.util.Collections.emptySet());
                 }
             } catch (Exception e) {
                 Log.w(TAG, "grade diff failed", e);
@@ -751,7 +754,7 @@ public final class CampusSyncClient {
             // window.open 的临时 WebView 只负责把 URL 交回主隐藏会话。
             popup.stopLoading();
         }
-        popup.destroy();
+        popup.post(popup::destroy);
     }
 
     private void capturePortalHost(String url) {

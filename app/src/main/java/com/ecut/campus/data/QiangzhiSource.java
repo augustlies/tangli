@@ -166,7 +166,23 @@ public final class QiangzhiSource implements TimetableSource {
             int end = indexOfIgnoreCase(html, "</table>", k);
             table = html.substring(Math.max(0, start), end < 0 ? html.length() : end + 8);
         } else {
-            r.warnings.add("没有 #kbtable，按整页解析");
+            Matcher tbl = Pattern.compile("(?is)<table\\b[^>]*>.*?</table>").matcher(html);
+            String best = null;
+            while (tbl.find()) {
+                String candidate = tbl.group();
+                int wk = candidate.indexOf("星期一");
+                if (wk < 0) wk = candidate.indexOf("周一");
+                if (wk >= 0) {
+                    int inner = lastIndexOfIgnoreCase(candidate.substring(0, wk), "<table");
+                    best = inner > 0 ? candidate.substring(inner) : candidate;
+                    break;
+                }
+            }
+            if (best != null) {
+                table = best;
+            } else {
+                r.warnings.add("没有 #kbtable，按整页解析");
+            }
         }
 
         Map<String, Timetable.Course> grouped = new LinkedHashMap<>();
@@ -379,13 +395,15 @@ public final class QiangzhiSource implements TimetableSource {
 
     /** 行表头 → 节次：「0102」「01,02」「1-2节」优先，其次「第三大节」，都没有按行号。 */
     static int[] rowLabelSections(String label, int dataRow) {
-        String t = label == null ? "" : label.replaceAll("\\s+", "");
+        String raw = label == null ? "" : label;
+        String t = raw.replaceAll("\\s+", "");
         Matcher pairs = Pattern.compile("(?<![0-9])(\\d{2})(\\d{2})(?![0-9])").matcher(t);
         if (pairs.find()) {
             int a = Integer.parseInt(pairs.group(1)), b = Integer.parseInt(pairs.group(2));
             if (a > 0 && b >= a && b - a < 6) return new int[]{a, b};
         }
-        Matcher nums = Pattern.compile("\\d+").matcher(t.replaceAll("^第[一二三四五六七八九十]+大节", ""));
+        String withoutTimes = raw.replaceAll("\\d{1,2}:\\d{2}", " ").replaceAll("\\s+", "");
+        Matcher nums = Pattern.compile("\\d+").matcher(withoutTimes.replaceAll("^第[一二三四五六七八九十]+大节", ""));
         List<Integer> list = new ArrayList<>();
         while (nums.find()) list.add(Integer.parseInt(nums.group()));
         if (list.size() >= 2) {

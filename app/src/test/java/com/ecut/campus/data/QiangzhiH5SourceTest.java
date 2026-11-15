@@ -69,10 +69,26 @@ public class QiangzhiH5SourceTest {
         Timetable.Session mon = os.sessions.get(0).dayOfWeek == 1 ? os.sessions.get(0) : os.sessions.get(1);
         assertEquals(Arrays.asList(1, 2, 3), mon.weeks);
         assertEquals("A401", mon.location);
+        assertEquals("08:00", mon.timeStart);
+        assertEquals("09:40", mon.timeEnd);
         // 没有 classWeekDetails 时按 classWeek
         assertEquals(Arrays.asList(1, 2), lab.sessions.get(0).weeks);
         assertEquals(9, lab.sessions.get(0).startSection);
         assertEquals(10, lab.sessions.get(0).endSection);
+    }
+
+    @Test
+    public void readsStandardEndTimeKeyToo() {
+        String raw = "{\"term\":{\"semesterId\":\"2026-2027-1\"},\"weeks\":{\"1\":{\"date\":[],\"item\":[{"
+                + "\"courseName\":\"物理\",\"teacherName\":\"教师A\",\"location\":\"B102\","
+                + "\"classTime\":\"20304\",\"classWeek\":\"1-4\",\"classWeekDetails\":\",1,2,3,4,\","
+                + "\"startTime\":\"10:00\",\"endTime\":\"11:40\"}]}}}";
+        JwglxtFetcher.Result r = new QiangzhiH5Source().parse(raw);
+        assertTrue(r.ok());
+        Timetable.Session s = r.timetable.courses.get(0).sessions.get(0);
+        assertEquals("10:00", s.timeStart);
+        assertEquals("11:40", s.timeEnd);
+        assertTrue(s.hasCustomTime());
     }
 
     @Test

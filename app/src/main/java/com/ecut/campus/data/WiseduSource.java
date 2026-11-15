@@ -293,9 +293,10 @@ public final class WiseduSource implements TimetableSource {
     /** 「周三 2-4节 1-3周,10-13周 仙Ⅱ-304,周五 5-6节 2-18周(双) 仙1-216」 */
     static List<Slot> parseListSlots(String text) {
         List<Slot> out = new ArrayList<>();
-        for (String seg : text.split(",周|，周|;|；")) {
+        for (String seg : text.split("(?:[,，]\\s*(?=(?:周|星期)[一二三四五六日天])|[;；])")) {
             seg = seg.trim();
-            if (seg.startsWith("周")) seg = seg.substring(1);
+            if (seg.startsWith("星期")) seg = seg.substring(2).trim();
+            else if (seg.startsWith("周")) seg = seg.substring(1).trim();
             Matcher m = LIST_SEG.matcher(seg);
             if (!m.find() || m.group(1) == null) continue;
             Slot s = new Slot();

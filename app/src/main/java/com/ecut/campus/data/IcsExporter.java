@@ -33,52 +33,65 @@ public final class IcsExporter {
         sb.append("X-WR-CALNAME:").append(escape(semesterLabel)).append("\r\n");
 
         SimpleDateFormat stampFmt = new SimpleDateFormat("yyyyMMdd'T'HHmmss'Z'", Locale.US);
+        stampFmt.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
         String stamp = stampFmt.format(new Date());
         int uidSeed = 0;
 
         Calendar startCal = WeekMath.parseDate(start);
         if (startCal == null) return null;
+        SimpleDateFormat ymdFmt = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
 
-        for (Timetable.Course c : t.courses) {
-            for (Timetable.Session s : c.sessions) {
-                if (s.dayOfWeek < 1 || s.dayOfWeek > 7) continue;
-                for (int week = 1; week <= totalWeeks; week++) {
-                    if (!s.isActive(week)) continue;
-                    Calendar day = (Calendar) startCal.clone();
-                    day.add(Calendar.DAY_OF_YEAR, (week - 1) * 7 + (s.dayOfWeek - 1));
-                    String ymd = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(day.getTime());
-
-                    int secStart = Math.max(1, Math.min(ScheduleSettings.MAX_SECTIONS, s.startSection));
-                    int secEnd = Math.max(secStart, Math.min(ScheduleSettings.MAX_SECTIONS, s.endSection));
-                    int startMinutes = s.hasCustomTime()
-                            ? Timetable.Session.minutesOf(s.timeStart) : sched.startMinutes(secStart);
-                    int endMinutes = s.hasCustomTime()
-                            ? Timetable.Session.minutesOf(s.timeEnd) : sched.endMinutes(secEnd);
-
-                    String dtStart = ymd.replace("-", "") + "T"
-                            + hm(startMinutes) + "00";
-                    String dtEnd = ymd.replace("-", "") + "T"
-                            + hm(endMinutes) + "00";
-
-                    sb.append("BEGIN:VEVENT\r\n");
-                    sb.append("UID:tangli-").append(System.identityHashCode(t))
-                            .append('-').append(uidSeed++).append("@ecut.campus\r\n");
-                    sb.append("DTSTAMP:").append(stamp).append("\r\n");
-                    sb.append("DTSTART;TZID=Asia/Shanghai:").append(dtStart).append("\r\n");
-                    sb.append("DTEND;TZID=Asia/Shanghai:").append(dtEnd).append("\r\n");
-                    sb.append("SUMMARY:").append(escape(c.name)).append("\r\n");
-                    String loc = s.location == null ? "" : s.location.trim();
-                    if (!loc.isEmpty()) sb.append("LOCATION:").append(escape(loc)).append("\r\n");
-                    String teacher = s.teacherFor(week, c.teacher).trim();
-                    if (!teacher.isEmpty()) {
-                        sb.append("DESCRIPTION:").append(escape(teacher)).append("\r\n");
-                    }
-                    sb.append("END:VEVENT\r\n");
+        for (int week = 1; week <= totalWeeks; week++) {
+            WeekOverlay ov = WeekOverlay.build(t, start, week);
+            for (Timetable.Course c : t.courses) {
+                for (Timetable.Session s : c.sessions) {
+                    if (s.dayOfWeek < 1 || s.dayOfWeek > 7 || !s.isActive(week)) continue;
+                    if (ov.cancelled.containsKey(s)) continue;
+                    uidSeed = appendEvent(sb, t, startCal, ymdFmt, sched, stamp, week, c, s, uidSeed);
                 }
+            }
+            for (WeekOverlay.Extra ex : ov.extras) {
+                if (ex.session.dayOfWeek < 1 || ex.session.dayOfWeek > 7) continue;
+                uidSeed = appendEvent(sb, t, startCal, ymdFmt, sched, stamp, week,
+                        ex.course, ex.session, uidSeed);
             }
         }
         sb.append("END:VCALENDAR\r\n");
         return sb.toString();
+    }
+
+    private static int appendEvent(StringBuilder sb, Timetable t, Calendar startCal,
+                                   SimpleDateFormat ymdFmt, ScheduleSettings sched, String stamp,
+                                   int week, Timetable.Course c, Timetable.Session s, int uidSeed) {
+        Calendar day = (Calendar) startCal.clone();
+        day.add(Calendar.DAY_OF_YEAR, (week - 1) * 7 + (s.dayOfWeek - 1));
+        String ymd = ymdFmt.format(day.getTime());
+
+        int secStart = Math.max(1, Math.min(ScheduleSettings.MAX_SECTIONS, s.startSection));
+        int secEnd = Math.max(secStart, Math.min(ScheduleSettings.MAX_SECTIONS, s.endSection));
+        int startMinutes = s.hasCustomTime()
+                ? Timetable.Session.minutesOf(s.timeStart) : sched.startMinutes(secStart);
+        int endMinutes = s.hasCustomTime()
+                ? Timetable.Session.minutesOf(s.timeEnd) : sched.endMinutes(secEnd);
+
+        String dtStart = ymd.replace("-", "") + "T" + hm(startMinutes) + "00";
+        String dtEnd = ymd.replace("-", "") + "T" + hm(endMinutes) + "00";
+
+        sb.append("BEGIN:VEVENT\r\n");
+        sb.append("UID:tangli-").append(System.identityHashCode(t))
+                .append('-').append(uidSeed++).append("@ecut.campus\r\n");
+        sb.append("DTSTAMP:").append(stamp).append("\r\n");
+        sb.append("DTSTART;TZID=Asia/Shanghai:").append(dtStart).append("\r\n");
+        sb.append("DTEND;TZID=Asia/Shanghai:").append(dtEnd).append("\r\n");
+        sb.append("SUMMARY:").append(escape(c.name)).append("\r\n");
+        String loc = s.location == null ? "" : s.location.trim();
+        if (!loc.isEmpty()) sb.append("LOCATION:").append(escape(loc)).append("\r\n");
+        String teacher = s.teacherFor(week, c.teacher).trim();
+        if (!teacher.isEmpty()) {
+            sb.append("DESCRIPTION:").append(escape(teacher)).append("\r\n");
+        }
+        sb.append("END:VEVENT\r\n");
+        return uidSeed;
     }
 
     private static String hm(int minutes) {

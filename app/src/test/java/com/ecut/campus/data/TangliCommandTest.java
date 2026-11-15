@@ -219,4 +219,20 @@ public class TangliCommandTest {
         for (Timetable.Adjust a : p.result.adjusts) { weeks.add(a.week); assertEquals(a.week, a.toWeek); assertEquals(6, a.toDay); }
         assertEquals(new java.util.HashSet<>(java.util.Arrays.asList(3, 4, 5)), weeks);
     }
+
+    @Test
+    public void sectionHandlesOutOfOrderEntriesSameAsSorted() {
+        TangliCommand.Plan inOrder = TangliCommand.plan(
+                "烫梨指令 v1\n作息 第1节 08:15-09:00 第2节 09:20-10:05", base(), env());
+        TangliCommand.Plan outOfOrder = TangliCommand.plan(
+                "烫梨指令 v1\n作息 第2节 09:20-10:05 第1节 08:15-09:00", base(), env());
+        assertEquals(0, inOrder.errorCount());
+        assertEquals(0, outOfOrder.errorCount());
+        assertArrayEquals(inOrder.sectionStart, outOfOrder.sectionStart);
+        assertArrayEquals(inOrder.sectionEnd, outOfOrder.sectionEnd);
+        assertEquals(495, outOfOrder.sectionStart[1]);
+        assertEquals(540, outOfOrder.sectionEnd[1]);
+        assertEquals(560, outOfOrder.sectionStart[2]);
+        assertEquals(605, outOfOrder.sectionEnd[2]);
+    }
 }

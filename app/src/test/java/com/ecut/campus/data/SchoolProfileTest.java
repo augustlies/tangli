@@ -163,4 +163,13 @@ public class SchoolProfileTest {
         assertEquals("", PageSample.sanitize("not json"));
         assertEquals("/a/b", PageSample.scrub("/a/b?ticket=ST-1"));
     }
+
+    @Test
+    public void toJsonPreservesAliases() {
+        SchoolProfile p = SchoolProfile.custom("https://jw.example.edu.cn/jwglxt/", null);
+        assertNotNull(p);
+        p.aliases.add("示例大学别名");
+        SchoolProfile decoded = SchoolProfile.fromJson(p.toJson());
+        assertEquals(java.util.Collections.singletonList("示例大学别名"), decoded.aliases);
+    }
 }

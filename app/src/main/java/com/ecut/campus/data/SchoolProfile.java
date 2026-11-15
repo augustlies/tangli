@@ -212,6 +212,7 @@ public final class SchoolProfile {
             o.put("access", access.key());
             o.put("loginUrl", loginUrl);
             o.put("hosts", new JSONArray(hosts));
+            if (!aliases.isEmpty()) o.put("aliases", new JSONArray(aliases));
             o.put("verified", verified);
             o.put("ecutFeatures", ecutFeatures);
         } catch (Exception ignored) {

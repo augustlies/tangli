@@ -73,6 +73,15 @@ public class WiseduSourceTest {
         assertTrue(sl.get(1).weeks.contains(18));
         assertFalse(sl.get(1).weeks.contains(3));
         assertTrue(WiseduSource.parseListSlots("自由时间 1-16周").isEmpty());
+
+        java.util.List<WiseduSource.Slot> withSpaceAndXingqi = WiseduSource.parseListSlots(
+                "星期一 1-2节 1-16周 仙Ⅰ-101, 星期五 5-8节 2-18周(双) 仙1-216");
+        assertEquals(2, withSpaceAndXingqi.size());
+        assertEquals(1, withSpaceAndXingqi.get(0).day);
+        assertEquals("仙Ⅰ-101", withSpaceAndXingqi.get(0).location);
+        assertEquals(5, withSpaceAndXingqi.get(1).day);
+        assertEquals(5, withSpaceAndXingqi.get(1).start);
+        assertEquals(8, withSpaceAndXingqi.get(1).end);
     }
 
     @Test

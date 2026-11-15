@@ -319,7 +319,7 @@ public final class SemesterArchive {
                 && expectedWeeks == SemesterMetaPolicy.resolveTotalWeeks(
                         mirror.semester.totalWeeks)
                 && expectedStart.equals(Prefs.semesterStartDate(ctx))
-                && expectedWeeks == Prefs.totalWeeks(ctx);
+                && expectedWeeks == Prefs.storedTotalWeeks(ctx);
     }
 
     /**

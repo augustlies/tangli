@@ -22,6 +22,10 @@ final class HistorySync {
      * 当前学期保持 active 不变，历史学期只进归档。
      */
     void start() {
+        if (a.activeSync != null && a.activeSync.isRunning()) {
+            Toast.makeText(a, "正在同步，请稍候", Toast.LENGTH_SHORT).show();
+            return;
+        }
         Grades grades = GradesStore.load(a);
         if (grades.semesters.isEmpty()) {
             Toast.makeText(a, "先同步一次成绩，才知道要拉取哪些学年", Toast.LENGTH_SHORT).show();
@@ -77,6 +81,7 @@ final class HistorySync {
     }
 
     private void syncNextHistorySemester() {
+        if (a.isFinishing() || a.isDestroyed()) return;
         if (historyCursorYear > historyEndYear) {
             Toast.makeText(a, "历史学期同步完成", Toast.LENGTH_SHORT).show();
             a.refreshTimetableTab();
@@ -125,7 +130,8 @@ final class HistorySync {
     }
 
     private void advanceHistoryCursor() {
-        if (historyCursorTerm >= 3) {
+        int maxTerm = Schools.current(a).vendor == com.ecut.campus.data.SchoolProfile.Vendor.QIANGZHI ? 2 : 3;
+        if (historyCursorTerm >= maxTerm) {
             historyCursorYear++;
             historyCursorTerm = 1;
         } else {
