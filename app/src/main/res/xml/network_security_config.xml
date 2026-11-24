@@ -1,10 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- 学校 aTrust 代理可能存在证书链问题，按需放开 -->
+    <!--
+        课程目录和自定义学校允许用户输入 HTTP 教务网址；Android 的网络安全配置不能
+        限定到运行时才知道的用户学校域名，因此明文 HTTP 仍是全局例外。
+        只信任系统 CA 普遍；用户安装的 CA 仅用于已真机验证的 ECUT/aTrust 域名。
+    -->
     <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    <domain-config>
+        <domain includeSubdomains="true">atrust1.ecut.edu.cn</domain>
+        <domain includeSubdomains="true">atrust.ecut.edu.cn</domain>
         <trust-anchors>
             <certificates src="system" />
             <certificates src="user" />
         </trust-anchors>
-    </base-config>
+    </domain-config>
 </network-security-config>

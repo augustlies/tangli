@@ -20,6 +20,11 @@ public final class TimetableShare {
 
     private TimetableShare() {}
 
+    private static final int MAX_SHARE_TEXT_CHARS = 3 * 1024 * 1024;
+    private static final int MAX_UNCOMPRESSED_BYTES = TimetableStore.MAX_IMPORT_CHARS;
+    private static final int MAX_SHARED_COURSE_NAME_CHARS = 256;
+    private static final int MAX_SHARED_FIELD_CHARS = 512;
+
     public static final String PREFIX = "TLKB1:";
 
     public static final class Shared {
@@ -71,53 +76,82 @@ public final class TimetableShare {
 
     /** 从任意文本里找出分享码并解析（允许前后夹着微信里的其他文字）。失败返回 null。 */
     public static Shared decode(String text) {
-        if (text == null) return null;
+        if (text == null || text.length() > MAX_SHARE_TEXT_CHARS) return null;
         int i = text.indexOf(PREFIX);
         if (i < 0) return null;
         int j = i + PREFIX.length();
         int k = j;
         while (k < text.length() && B64.isChar(text.charAt(k))) k++;
+        if (k - j > ((MAX_UNCOMPRESSED_BYTES + 2) / 3) * 4) return null;
         try {
             byte[] packed = B64.decode(text.substring(j, k));
+            if (packed.length > MAX_UNCOMPRESSED_BYTES) return null;
             Inflater inf = new Inflater(true);
             inf.setInput(packed);
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
             byte[] buf = new byte[2048];
             int guard = 0;
-            while (!inf.finished() && guard++ < 10_000) {
-                int n = inf.inflate(buf);
-                if (n == 0 && (inf.needsInput() || inf.needsDictionary())) break;
-                bos.write(buf, 0, n);
+            boolean complete;
+            try {
+                while (!inf.finished() && guard++ < 10_000) {
+                    int n = inf.inflate(buf);
+                    if (n == 0) break;
+                    if (n > MAX_UNCOMPRESSED_BYTES - bos.size()) {
+                        throw new DataFormatException("share exceeds size limit");
+                    }
+                    bos.write(buf, 0, n);
+                }
+                complete = inf.finished();
+            } finally {
+                inf.end();
             }
-            inf.end();
-            JSONObject o = new JSONObject(bos.toString("UTF-8"));
+            if (!complete) return null;
+            String json = bos.toString("UTF-8");
+            TimetableStore.ensureBoundedJsonNesting(json);
+            JSONObject o = new JSONObject(json);
             Shared sh = new Shared();
             sh.owner = o.optString("o", "");
             sh.semesterId = o.optString("s", "");
             sh.startDate = o.optString("d", "");
             sh.schedule = o.optJSONObject("w");
+            if (sh.owner.length() > 4096 || sh.semesterId.length() > 4096 || sh.startDate.length() > 4096
+                    || !validScheduleSize(sh.schedule)) return null;
             Timetable t = new Timetable();
             t.semester.id = sh.semesterId;
             t.semester.startDate = sh.startDate;
             JSONArray cs = o.getJSONArray("c");
+            if (cs.length() > TimetableStore.MAX_IMPORT_COURSES) return null;
+            int totalSessions = 0;
             for (int a = 0; a < cs.length(); a++) {
                 JSONObject co = cs.getJSONObject(a);
                 Timetable.Course c = new Timetable.Course();
                 c.name = co.optString("n", "");
+                if (c.name.length() > MAX_SHARED_COURSE_NAME_CHARS) return null;
                 c.key = "shared_" + a;
                 JSONArray ss = co.getJSONArray("t");
+                if (ss.length() > TimetableStore.MAX_IMPORT_SESSIONS_PER_COURSE
+                        || totalSessions > TimetableStore.MAX_IMPORT_SESSIONS - ss.length()) return null;
+                totalSessions += ss.length();
                 for (int b = 0; b < ss.length(); b++) {
                     JSONArray x = ss.getJSONArray(b);
+                    if (x.length() < 5 || x.length() > 7) return null;
                     Timetable.Session s = new Timetable.Session();
                     s.dayOfWeek = x.getInt(0);
                     s.startSection = x.getInt(1);
                     s.endSection = x.getInt(2);
+                    if (s.dayOfWeek < 1 || s.dayOfWeek > 7 || s.startSection < 1
+                            || s.startSection > 99 || s.endSection < s.startSection || s.endSection > 99) return null;
                     s.weeksRaw = x.getString(3);
+                    if (s.weeksRaw.length() > 4096) return null;
                     WeekRange.Parsed p = WeekRange.parse(s.weeksRaw);
+                    if (p.weeks.size() > WeekRange.MAX_WEEK) return null;
                     s.weeks = p.ok() ? new ArrayList<>(p.weeks) : new ArrayList<>();
                     s.location = x.optString(4, "");
+                    if (s.location.length() > MAX_SHARED_FIELD_CHARS) return null;
                     s.timeStart = x.optString(5, "");
                     s.timeEnd = x.optString(6, "");
+                    if (s.timeStart.length() > MAX_SHARED_FIELD_CHARS
+                            || s.timeEnd.length() > MAX_SHARED_FIELD_CHARS) return null;
                     c.sessions.add(s);
                 }
                 t.courses.add(c);
@@ -128,6 +162,14 @@ public final class TimetableShare {
                  | IllegalArgumentException e) {
             return null;
         }
+    }
+
+    private static boolean validScheduleSize(JSONObject schedule) {
+        if (schedule == null) return true;
+        JSONArray durations = schedule.optJSONArray("d");
+        JSONArray breaks = schedule.optJSONArray("b");
+        return (durations == null || durations.length() <= 16)
+                && (breaks == null || breaks.length() <= 16);
     }
 
     /** 不依赖 java.util.Base64（API 26+）的 base64url。 */

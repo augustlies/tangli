@@ -717,6 +717,7 @@ public class CourseEditActivity extends AppCompatActivity {
             if (oldName != null) com.ecut.campus.fun.FunPrefs.renameAbsence(this, timetable, oldName, name);
             dirty = false;
             Toast.makeText(this, "已保存课程：" + name, Toast.LENGTH_SHORT).show();
+            ClassWidget.updateAll(this);
             setResult(RESULT_OK);
             finish();
         } else {
@@ -746,6 +747,7 @@ public class CourseEditActivity extends AppCompatActivity {
                 .setPositiveButton("删除", (d, w) -> {
                     timetable.courses.remove(editingCourse);
                     if (TimetableStore.save(this, timetable)) {
+                        ClassWidget.updateAll(this);
                         dirty = false;
                         setResult(RESULT_OK);
                         finish();

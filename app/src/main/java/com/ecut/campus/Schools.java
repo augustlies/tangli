@@ -86,6 +86,9 @@ public final class Schools {
     public static void select(Context ctx, SchoolProfile p) {
         if (p == null) return;
         SchoolProfile old = current(ctx);
+        // Claim/migrate legacy files before changing the selected owner.
+        SchoolFiles.file(ctx, "timetable_semesters.json");
+        com.ecut.campus.data.SyncGeneration.invalidate();
         String before = Prefs.schoolId(ctx);
         if (p.isCustom()) Prefs.setCustomSchoolJson(ctx, p.toJson().toString());
         Prefs.setSchoolId(ctx, p.id);
@@ -94,9 +97,9 @@ public final class Schools {
             Prefs.setSessionExpired(ctx, false);
         }
         if (!SchoolProfile.sameSchool(old, p)) {
-            // 上一所学校的成绩不能挂在新学校名下，也不能当作「旧成绩」去比对新学校，
-            // 否则第一次同步会把新学校的全部成绩当成新出成绩推送。成绩可从教务重新同步。
-            com.ecut.campus.data.GradesStore.clear(ctx);
+            // Files stay in their school directories; reset only shared UI caches.
+            Prefs.setSemesterStartDate(ctx, "");
+            Prefs.setTotalWeeks(ctx, 20);
             Prefs.setNewGradeKeys(ctx, new java.util.ArrayList<>());
             Prefs.setGradesDemo(ctx, false);
         }

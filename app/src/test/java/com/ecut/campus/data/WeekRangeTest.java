@@ -143,6 +143,21 @@ public class WeekRangeTest {
         assertFalse(p.ok());
     }
 
+    @Test
+    public void supportsWeek99AndRejectsValuesOutsideSupportedRange() {
+        assertEquals(Arrays.asList(98, 99), WeekRange.parse("98-99周").weeks);
+        assertFalse(WeekRange.parse("99-100周").ok());
+        assertFalse(WeekRange.parse("2147483647-2147483647周").ok());
+        assertFalse(WeekRange.parse("1-2147483647周").ok());
+        assertFalse(WeekRange.parse(repeat('1', 4097)).ok());
+    }
+
+    private static String repeat(char c, int count) {
+        char[] chars = new char[count];
+        Arrays.fill(chars, c);
+        return new String(chars);
+    }
+
     // ---------- isActive 保底行为 ----------
 
     @Test

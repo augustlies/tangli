@@ -83,5 +83,18 @@
                 android:textSize="13sp"
                 android:visibility="gone" />
         </FrameLayout>
+
+        <TextView
+            android:id="@+id/w_exams"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:maxLines="3"
+            android:includeFontPadding="false"
+            android:textColor="@color/w_ink"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
     </LinearLayout>
 </FrameLayout>

@@ -119,7 +119,7 @@ public class SchoolFinderActivity extends AppCompatActivity {
         s.setSupportZoom(true);
         s.setBuiltInZoomControls(true);
         s.setDisplayZoomControls(false);
-        s.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+        s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {

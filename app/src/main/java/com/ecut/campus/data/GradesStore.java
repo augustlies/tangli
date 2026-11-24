@@ -5,33 +5,26 @@ import android.util.Log;
 
 import org.json.JSONException;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * 成绩本地存储（filesDir/grades.json）。
+ * 成绩本地存储（学校目录内的 grades.json）。
  * 原子写入，支持增量合并不同学期查询出的成绩。
  */
 public final class GradesStore {
 
     private static final String TAG = "GradesStore";
     private static final String FILE_NAME = "grades.json";
-    private static final String TMP_NAME = "grades.json.tmp";
 
     private GradesStore() {}
 
     public static Grades load(Context ctx) {
-        File f = new File(ctx.getFilesDir(), FILE_NAME);
-        if (!f.exists()) return new Grades();
+        File f = com.ecut.campus.SchoolFiles.file(ctx, FILE_NAME);
         try {
-            String json = readAll(new FileInputStream(f));
-            return Grades.fromJson(json);
+            String json = AtomicFileStore.read(f);
+            return json == null ? new Grades() : Grades.fromJson(json);
         } catch (JSONException e) {
             Log.e(TAG, "grades.json 损坏，返回空成绩", e);
             return new Grades();
@@ -42,39 +35,26 @@ public final class GradesStore {
     }
 
     public static boolean save(Context ctx, Grades g) {
-        File dir = ctx.getFilesDir();
-        File tmp = new File(dir, TMP_NAME);
-        File dst = new File(dir, FILE_NAME);
         try {
-            String json = g.toJson().toString();
-            try (FileOutputStream fos = new FileOutputStream(tmp)) {
-                fos.write(json.getBytes(StandardCharsets.UTF_8));
-                fos.flush();
-                fos.getFD().sync();
-            }
-            if (dst.exists() && !dst.delete()) {
-                Log.w(TAG, "旧成绩文件删除失败，继续覆盖");
-            }
-            if (!tmp.renameTo(dst)) {
-                Log.e(TAG, "rename 失败");
-                return false;
-            }
+            AtomicFileStore.write(com.ecut.campus.SchoolFiles.file(ctx, FILE_NAME), g.toJson().toString());
             return true;
         } catch (Exception e) {
             Log.e(TAG, "保存成绩失败", e);
-            if (tmp.exists()) tmp.delete();
             return false;
         }
     }
 
     public static boolean exists(Context ctx) {
-        return new File(ctx.getFilesDir(), FILE_NAME).exists();
+        return AtomicFileStore.exists(com.ecut.campus.SchoolFiles.file(ctx, FILE_NAME));
     }
 
     public static void clear(Context ctx) {
-        File dir = ctx.getFilesDir();
-        new File(dir, FILE_NAME).delete();
-        new File(dir, TMP_NAME).delete();
+        SyncGeneration.invalidate();
+        try {
+            AtomicFileStore.clear(com.ecut.campus.SchoolFiles.file(ctx, FILE_NAME));
+        } catch (Exception e) {
+            Log.e(TAG, "清理本地文件失败", e);
+        }
     }
 
     /**
@@ -131,12 +111,4 @@ public final class GradesStore {
         return Grades.fromJson(json);
     }
 
-    private static String readAll(InputStream is) throws Exception {
-        try (InputStream in = is; ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = in.read(buf)) > 0) bos.write(buf, 0, n);
-            return bos.toString("UTF-8");
-        }
-    }
 }

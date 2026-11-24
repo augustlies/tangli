@@ -16,6 +16,8 @@ import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 
 import com.ecut.campus.data.DayPlan;
+import com.ecut.campus.data.Dates;
+import com.ecut.campus.data.ReminderSchedule;
 
 import java.util.List;
 
@@ -33,6 +35,10 @@ public final class ClassReminder {
     private static final String EX_END = "end";
     private static final String EX_TITLE = "title";
     private static final String EX_TEXT = "text";
+    private static final String EX_MULTI = "multiple";
+    private static final String EX_RECHECK = "recheck";
+    private static final String EX_FIRE_AT = "fire_at";
+    static final int LOOKAHEAD_DAYS = ReminderSchedule.LOOKAHEAD_DAYS;
 
     /** 打开/关闭、改提前分钟、课表或作息变了、开机、改时间后都调一次。 */
     public static void reschedule(Context c) {
@@ -41,10 +47,13 @@ public final class ClassReminder {
         PendingIntent old = pending(c, null);
         am.cancel(old);
         if (!Prefs.classRemind(c)) return;
-        Intent next = findNext(c, System.currentTimeMillis());
+        long now = System.currentTimeMillis();
+        Intent next = findNext(c, now);
         if (next == null) return;
-        long fire = next.getLongExtra(EX_START, 0) - Prefs.classRemindLead(c) * 60_000L;
-        fire = Math.max(fire, System.currentTimeMillis() + 1000);
+        boolean recheck = next.getBooleanExtra(EX_RECHECK, false);
+        long fire = recheck ? next.getLongExtra(EX_FIRE_AT, 0)
+                : next.getLongExtra(EX_START, 0) - Prefs.classRemindLead(c) * 60_000L;
+        fire = Math.max(fire, now + 1000);
         PendingIntent pi = pending(c, next);
         if (Build.VERSION.SDK_INT >= 23) am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fire, pi);
         else am.set(AlarmManager.RTC_WAKEUP, fire, pi);
@@ -55,27 +64,56 @@ public final class ClassReminder {
         ClassPlans.Ctx x = ClassPlans.load(c);
         long lead = Prefs.classRemindLead(c) * 60_000L;
         long today = ClassPlans.midnight(now);
-        for (int d = 0; d < 8; d++) {
+        for (int d = 0; d < LOOKAHEAD_DAYS; d++) {
             long mid = ClassPlans.addDays(today, d);
             String ymd = ClassPlans.ymd(mid);
             List<DayPlan.Item> items = ClassPlans.day(x, ymd);
             for (DayPlan.Item it : items) {
                 long start = ClassPlans.at(mid, it.startMin);
                 if (start - lead <= now) continue;
-                Intent i = new Intent(c, Receiver.class);
-                i.putExtra(EX_START, start);
-                i.putExtra(EX_END, ClassPlans.at(mid, it.endMin));
-                String time = com.ecut.campus.data.Timetable.Session.formatHm(it.startMin);
-                i.putExtra(EX_TITLE, time + "  " + it.name);
-                StringBuilder sb = new StringBuilder();
-                if (!it.location.isEmpty()) sb.append(it.location);
-                if (!it.sections.isEmpty()) sb.append(sb.length() > 0 ? " · " : "").append(it.sections);
-                if (!it.tag.isEmpty()) sb.append(sb.length() > 0 ? " · " : "").append(it.tag);
-                i.putExtra(EX_TEXT, sb.toString());
-                return i;
+                List<DayPlan.Item> simultaneous = ReminderSchedule.sameStart(items, it.startMin);
+                return alarmIntent(c, mid, start, simultaneous);
             }
         }
+        if (ReminderSchedule.hasPotentialFutureClass(x.t, x.start,
+                Dates.addDays(ClassPlans.ymd(today), LOOKAHEAD_DAYS))) {
+            Intent retry = new Intent(c, Receiver.class);
+            retry.putExtra(EX_RECHECK, true);
+            retry.putExtra(EX_FIRE_AT, ReminderSchedule.nextSearchAt(today));
+            return retry;
+        }
         return null;
+    }
+
+    private static Intent alarmIntent(Context c, long midnight, long start, List<DayPlan.Item> items) {
+        Intent i = new Intent(c, Receiver.class);
+        long end = start;
+        String time = com.ecut.campus.data.Timetable.Session.formatHm(items.get(0).startMin);
+        StringBuilder names = new StringBuilder();
+        StringBuilder details = new StringBuilder();
+        for (DayPlan.Item item : items) {
+            if (names.length() > 0) names.append("、");
+            names.append(item.name);
+            end = Math.max(end, ClassPlans.at(midnight, item.endMin));
+            if (details.length() > 0) details.append("；");
+            details.append(item.name);
+            if (!item.sections.isEmpty()) details.append(" ").append(item.sections);
+            if (!item.location.isEmpty()) details.append(" · ").append(item.location);
+            if (!item.tag.isEmpty()) details.append(" · ").append(item.tag);
+        }
+        if (items.size() == 1) {
+            DayPlan.Item item = items.get(0);
+            details.setLength(0);
+            if (!item.location.isEmpty()) details.append(item.location);
+            if (!item.sections.isEmpty()) details.append(details.length() > 0 ? " · " : "").append(item.sections);
+            if (!item.tag.isEmpty()) details.append(details.length() > 0 ? " · " : "").append(item.tag);
+        }
+        i.putExtra(EX_START, start);
+        i.putExtra(EX_END, end);
+        i.putExtra(EX_TITLE, time + "  " + names);
+        i.putExtra(EX_TEXT, details.toString());
+        i.putExtra(EX_MULTI, items.size() > 1);
+        return i;
     }
 
     private static PendingIntent pending(Context c, Intent extras) {
@@ -118,6 +156,9 @@ public final class ClassReminder {
                 .setAutoCancel(true)
                 .setContentIntent(pi)
                 .setTimeoutAfter(Math.max(60_000L, end - now));
+        if (data.getBooleanExtra(EX_MULTI, false)) {
+            b.setStyle(new NotificationCompat.BigTextStyle().bigText(text));
+        }
         if (start > now) {
             // 通知里显示「还有 xx:xx」实时倒计时，到点后自动变成正计时
             b.setWhen(start).setShowWhen(true).setUsesChronometer(true).setChronometerCountDown(true);
@@ -132,7 +173,7 @@ public final class ClassReminder {
         @Override
         public void onReceive(Context c, Intent intent) {
             String a = intent.getAction();
-            if (a == null) post(c, intent); // 自己排的闹钟
+            if (a == null && !intent.getBooleanExtra(EX_RECHECK, false)) post(c, intent); // 自己排的闹钟
             reschedule(c);
             ClassWidget.updateAll(c);
         }

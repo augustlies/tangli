@@ -100,6 +100,19 @@ public final class CampusSyncClient {
     private boolean running;
     private int ehallLoginChecks;
     private int gradeReadAttempts;
+    private final long syncGeneration = com.ecut.campus.data.SyncGeneration.current();
+
+    private boolean acceptsResult() {
+        return !finished && com.ecut.campus.data.SyncGeneration.isCurrent(syncGeneration)
+                && SchoolFiles.owner(school).equals(SchoolFiles.owner(Schools.current(appContext)));
+    }
+
+    private void evaluate(String js, android.webkit.ValueCallback<String> callback) {
+        if (!acceptsResult()) return;
+        webView.evaluateJavascript(js, raw -> {
+            if (acceptsResult()) callback.onReceiveValue(raw);
+        });
+    }
 
     private final Runnable timeout = () -> {
         if (!finished) fail("同步超时，请确认" + loginLabel() + "登录仍有效");
@@ -363,7 +376,7 @@ public final class CampusSyncClient {
                 "}" +
                 "return 'WAIT';" +
                 "})()";
-        webView.evaluateJavascript(js, r -> {
+        evaluate(js, r -> {
             String value = WebShellActivity.unwrapJsString(r);
             dlog(kind.label + " card: " + value);
             if (value.startsWith("CLICKED")) {
@@ -401,7 +414,7 @@ public final class CampusSyncClient {
                 "if(src&&src!=='about:blank')return src;" +
                 "}" +
                 "return '';})()";
-        webView.evaluateJavascript(js, raw -> {
+        evaluate(js, raw -> {
             if (finished || openedAppFrameLoaded) return;
             String src = WebShellActivity.unwrapJsString(raw);
             if (src == null || src.isEmpty() || "about:blank".equals(src)) return;
@@ -464,7 +477,7 @@ public final class CampusSyncClient {
                 "return xhr.responseText||'';" +
                 "}catch(e){return 'ERR:'+e;}" +
                 "})()";
-        webView.evaluateJavascript(js, raw -> {
+        evaluate(js, raw -> {
             String json = WebShellActivity.unwrapJsString(raw);
             if (json == null || json.isEmpty() || json.startsWith("ERR:")) {
                 fail("课表接口没有返回数据");
@@ -487,7 +500,7 @@ public final class CampusSyncClient {
     /** 其他学校：按厂商取原始数据，解析后走同一套合并落盘。 */
     private void extractOtherTimetable() {
         String js = source.extractionJs(school, targetXnm, targetXqm);
-        webView.evaluateJavascript(js, raw -> {
+        evaluate(js, raw -> {
             String text = WebShellActivity.unwrapJsString(raw);
             if (text == null || text.isEmpty() || text.startsWith("ERR:")) {
                 fail("课表接口没有返回数据");
@@ -521,7 +534,7 @@ public final class CampusSyncClient {
             saveTimetable(result);
             return;
         }
-        webView.evaluateJavascript(TermStartProbe.probeJs(school.vendor, semId), raw -> {
+        evaluate(TermStartProbe.probeJs(school.vendor, semId), raw -> {
             if (finished) return;
             String monday = TermStartProbe.detect(WebShellActivity.unwrapJsString(raw),
                     WeekMath.todayDateLabel());
@@ -532,6 +545,7 @@ public final class CampusSyncClient {
     }
 
     private void saveTimetable(JwglxtFetcher.Result result) {
+        if (!acceptsResult()) return;
         Timetable merged;
         if (targetXnm != null && !targetXnm.isEmpty()) {
             // 历史学期：合并进归档里该学期的既有数据，不动当前学期。
@@ -553,6 +567,7 @@ public final class CampusSyncClient {
             }
         }
         SemesterArchive.unifyColors(appContext);
+        ClassWidget.updateAll(appContext);
         Prefs.setLastSyncTime(appContext, now());
         dlog("Timetable saved: " + merged.courses.size()
                 + " courses (" + result.rawRecords + " records)");
@@ -565,32 +580,15 @@ public final class CampusSyncClient {
             extractQiangzhiGrades();
             return;
         }
-        String trigger = "(function(){" +
-                "try{" +
-                "window.__ecutReadGrades=function(){};" +
-                "var y=document.getElementById('xnm');var t=document.getElementById('xqm');" +
-                "if(y&&!window.__ecutGradeInited){y.value='';}" +
-                "if(t&&!window.__ecutGradeInited){t.value='';}" +
-                "if(window.jQuery){" +
-                "try{var g=window.jQuery('#tabGrid');" +
-                "if(g.length&&g.jqGrid){g.jqGrid('setGridParam',{rowNum:500,page:1});" +
-                "g.trigger('reloadGrid');}}" +
-                "catch(e){}" +
-                "}" +
-                "var pg=document.querySelector('select.ui-pg-selbox');" +
-                "if(pg){pg.value='500';" +
-                "pg.dispatchEvent(new Event('change',{bubbles:true}));" +
-                "if(window.jQuery)window.jQuery(pg).trigger('change');}" +
-                "var btn=document.getElementById('search_go');" +
-                "if(btn&&!window.__ecutGradeInited){" +
-                "window.__ecutGradeInited=true;btn.click();return 'CLICKED';}" +
-                "}catch(e){return 'ERR:'+e;}" +
-                "return 'READY';})()";
-        webView.evaluateJavascript(trigger, r -> {
+        String trigger = com.ecut.campus.data.GradeGridQuery.triggerJs();
+        evaluate(trigger, r -> {
             dlog("GRADE_TRIGGER: " + r);
+            if (!"CLICKED".equals(WebShellActivity.unwrapJsString(r))) {
+                handler.postDelayed(this::extractGrades, 500L);
+                return;
+            }
             logGradePageDiagnostics();
-            handler.postDelayed(this::readGradeRows, 3_200L);
-            handler.postDelayed(this::readGradeRows, 6_500L);
+            handler.postDelayed(this::readGradeRows, 500L);
         });
     }
 
@@ -606,25 +604,15 @@ public final class CampusSyncClient {
                 "return JSON.stringify({xnm:opts('xnm'),xqm:opts('xqm'),pg:pgopts()," +
                 "rows:t&&t.rows?t.rows.length:-1});" +
                 "})()";
-        webView.evaluateJavascript(js, raw -> dlog("GRADE_DIAG: "
+        evaluate(js, raw -> dlog("GRADE_DIAG: "
                 + WebShellActivity.unwrapJsString(raw)));
     }
 
     private void readGradeRows() {
         if (finished) return;
         gradeReadAttempts++;
-        String js = "(function(){" +
-                "var t=document.getElementById('tabGrid');" +
-                "if(!t||!t.rows||t.rows.length<=1){" +
-                "var b=(document.body&&document.body.innerText)||'';" +
-                "return /无(操作)?权限/.test(b)?'__NOPERM__':'';}" +
-                "var rows=[];" +
-                "for(var i=0;i<t.rows.length;i++){" +
-                "var row=[];var cs=t.rows[i].cells;" +
-                "for(var c=0;c<cs.length;c++){row.push((cs[c].innerText||'').trim());}" +
-                "rows.push(row);}" +
-                "return JSON.stringify({rows:rows});})()";
-        webView.evaluateJavascript(js, raw -> {
+        String js = com.ecut.campus.data.GradeGridQuery.readJs();
+        evaluate(js, raw -> {
             String decoded = WebShellActivity.unwrapJsString(raw);
             if ("__NOPERM__".equals(decoded)) {
                 fail("教务系统提示「无操作权限」：学校没给这个账号开放成绩查询（新生还没有成绩、评教没做完或查询未开放），"
@@ -632,7 +620,8 @@ public final class CampusSyncClient {
                 return;
             }
             if (decoded == null || decoded.isEmpty()) {
-                if (gradeReadAttempts >= 2) fail("成绩表格没有返回数据");
+                if (gradeReadAttempts >= 40) fail("成绩查询未完成或数据不完整，本地成绩已保留");
+                else handler.postDelayed(this::readGradeRows, 500L);
                 return;
             }
             Grades parsed = Grades.parseFromDomRows(decoded);
@@ -644,8 +633,8 @@ public final class CampusSyncClient {
             }
             dlog("GRADE_ROWS: " + decoded.length()
                     + " chars, courses=" + count + ", semesters=[" + semesters + "]");
-            if (count <= 0) {
-                if (gradeReadAttempts >= 2) fail("成绩解析为空，请稍后重试");
+            if (!com.ecut.campus.data.GradeGridQuery.complete(decoded, count)) {
+                fail("成绩解析不完整，本地成绩已保留，请稍后重试");
                 return;
             }
             saveGrades(parsed);
@@ -654,7 +643,7 @@ public final class CampusSyncClient {
 
     /** 强智：一次 POST 拿全部学期成绩表，Java 按表头解析。 */
     private void extractQiangzhiGrades() {
-        webView.evaluateJavascript(QiangzhiGrades.extractionJs(), raw -> {
+        evaluate(QiangzhiGrades.extractionJs(), raw -> {
             if (finished) return;
             String html = WebShellActivity.unwrapJsString(raw);
             if ("__NOPERM__".equals(html)) {
@@ -678,6 +667,7 @@ public final class CampusSyncClient {
     }
 
     private void saveGrades(Grades parsed) {
+        if (!acceptsResult()) return;
         {
             // 教务成绩是全量权威数据。直接覆盖而不是合并，避免旧演示数据
             // 或已撤销课程永久残留。
@@ -728,7 +718,7 @@ public final class CampusSyncClient {
                 "if(tool&&getComputedStyle(tool).display==='block')return 'LOGIN';" +
                 "return 'GUEST';" +
                 "})()";
-        webView.evaluateJavascript(js, raw -> {
+        evaluate(js, raw -> {
             if (finished || dataRequested || cardClicked) return;
             String state = WebShellActivity.unwrapJsString(raw);
             if ("LOGIN".equals(state)) {

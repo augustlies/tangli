@@ -103,6 +103,8 @@ public class WebShellActivity extends AppCompatActivity {
         webTitle = findViewById(R.id.web_title);
         toggleFitBtn = findViewById(R.id.btn_toggle_fit);
         school = Schools.current(this);
+        syncGeneration = com.ecut.campus.data.SyncGeneration.current();
+        syncOwner = SchoolFiles.owner(school);
 
         resolveTarget();
         if (webTitle != null) webTitle.setText(title);
@@ -238,7 +240,10 @@ public class WebShellActivity extends AppCompatActivity {
         s.setSupportZoom(true);
         s.setBuiltInZoomControls(true);
         s.setDisplayZoomControls(false);
-        s.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+        // Preserve existing ECUT portal compatibility for the verified workflow; custom-school
+        // pages cannot load HTTP subresources into HTTPS pages.
+        s.setMixedContentMode(school.isEcut() ? WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+                : WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         s.setUserAgentString(s.getUserAgentString().replace("; wv", ""));
 
         CookieManager cm = CookieManager.getInstance();
@@ -248,6 +253,8 @@ public class WebShellActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                pageGeneration++;
+                gradeQueryAttempts = 0;
                 progress.setVisibility(View.VISIBLE);
                 progress.setProgress(0);
                 if (!school.isEcut()) return;
@@ -398,49 +405,57 @@ public class WebShellActivity extends AppCompatActivity {
         });
     }
 
-    /**
-     * 从正方教务成绩页（jqGrid tabGrid DOM）提取成绩并落盘。
-     * 先将学年/学期设为空（全部）且每页条数调大，触发查询后提取全部 DOM 行，
-     * 同时保留页面内查询按钮监听，用户切换学年再次点击查询时也会自动增量合并到本地。
-     */
+    private long syncGeneration;
+    private long pageGeneration;
+    private String syncOwner;
+    private int gradeQueryAttempts;
+
+    private void postGradeRead(WebView view, Runnable action) {
+        long page = pageGeneration;
+        if (++gradeQueryAttempts > 40) return;
+        view.postDelayed(() -> {
+            if (page == pageGeneration && acceptsResult()) action.run();
+        }, 500L);
+    }
+
+    private boolean acceptsResult() {
+        return !isFinishing() && !isDestroyed()
+                && com.ecut.campus.data.SyncGeneration.isCurrent(syncGeneration)
+                && syncOwner != null && syncOwner.equals(SchoolFiles.owner(Schools.current(this)));
+    }
+
+    private void evaluate(WebView view, String js, android.webkit.ValueCallback<String> callback) {
+        if (!acceptsResult()) return;
+        long page = pageGeneration;
+        view.evaluateJavascript(js, raw -> {
+            if (callback != null && page == pageGeneration && acceptsResult()) callback.onReceiveValue(raw);
+        });
+    }
+
+    /** 全部学年/学期查询完成且 DOM 行数验证通过后，整体替换本地成绩。 */
     private void syncGradesFromDom(WebView view) {
-        String trigger = "(function(){" +
-                "try{" +
-                "window.__ecutReadGrades=function(){};" +
-                "var y=document.getElementById('xnm');var t=document.getElementById('xqm');" +
-                "if(y && !window.__ecutGradeInited){y.value='';}" +
-                "if(t && !window.__ecutGradeInited){t.value='';}" +
-                "var pg=document.querySelector('select.ui-pg-selbox');" +
-                "if(pg){pg.value='500';}" +
-                "var btn=document.getElementById('search_go');" +
-                "if(btn && !window.__ecutGradeInited){" +
-                "window.__ecutGradeInited=true;" +
-                "btn.click();return 'CLICKED';}" +
-                "}catch(e){return 'ERR:'+e;}" +
-                "return 'READY';})()";
-        view.evaluateJavascript(trigger, r -> {
+        String trigger = com.ecut.campus.data.GradeGridQuery.triggerJs();
+        evaluate(view, trigger, r -> {
             Log.i(TAG, "GRADE_TRIGGER: " + r);
-            view.postDelayed(() -> readGradeDomOnce(view), 3200);
-            view.postDelayed(() -> readGradeDomOnce(view), 6500);
+            if (!"CLICKED".equals(unwrapJsString(r))) {
+                postGradeRead(view, () -> syncGradesFromDom(view));
+                return;
+            }
+            postGradeRead(view, () -> readGradeDomOnce(view));
         });
     }
 
     private void readGradeDomOnce(WebView view) {
-        String js = "(function(){" +
-                "var t=document.getElementById('tabGrid');" +
-                "if(!t||!t.rows||t.rows.length<=1)return '';" +
-                "var rows=[];" +
-                "for(var i=0;i<t.rows.length;i++){" +
-                "var row=[];var cs=t.rows[i].cells;" +
-                "for(var c=0;c<cs.length;c++){row.push((cs[c].innerText||'').trim());}" +
-                "rows.push(row);}" +
-                "return JSON.stringify({rows:rows});})()";
-        view.evaluateJavascript(js, raw -> {
+        String js = com.ecut.campus.data.GradeGridQuery.readJs();
+        evaluate(view, js, raw -> {
             String decoded = unwrapJsString(raw);
-            if (decoded == null || decoded.isEmpty()) return;
+            if (decoded == null || decoded.isEmpty()) {
+                postGradeRead(view, () -> readGradeDomOnce(view));
+                return;
+            }
             Grades parsed = Grades.parseFromDomRows(decoded);
             int count = parsed.totalCourseCount();
-            if (count > 0) {
+            if (com.ecut.campus.data.GradeGridQuery.complete(decoded, count)) {
                 parsed.updatedAt = new SimpleDateFormat(
                         "yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).format(new Date());
                 parsed.recomputeAll();
@@ -497,7 +512,7 @@ public class WebShellActivity extends AppCompatActivity {
                 "return xhr.responseText||'';" +
                 "}catch(e){return '';}" +
                 "})()";
-        view.evaluateJavascript(js, raw -> {
+        evaluate(view, js, raw -> {
             String json = unwrapJsString(raw);
             if (json == null || json.isEmpty()) return;
             JwglxtFetcher.Result res = JwglxtFetcher.parse(json);
@@ -553,7 +568,7 @@ public class WebShellActivity extends AppCompatActivity {
                 "for(var f=0;f<window.frames.length;f++){try{var d=window.frames[f].document;" +
                 "h+='\\n'+d.documentElement.outerHTML.substring(0,200000);}catch(e){}}" +
                 "return h;}catch(e){return '';}})()";
-        webView.evaluateJavascript(js, raw -> {
+        evaluate(webView, js, raw -> {
             if (webView == null) { importing = false; return; }
             String html = unwrapJsString(raw);
             String url = webView.getUrl();
@@ -572,7 +587,7 @@ public class WebShellActivity extends AppCompatActivity {
 
     private void runImport(TimetableSource src, String pageUrl) {
         Toast.makeText(this, "正在读取" + src.label() + "教务的课表…", Toast.LENGTH_SHORT).show();
-        webView.evaluateJavascript(src.extractionJs(school, null, null), raw -> {
+        evaluate(webView, src.extractionJs(school, null, null), raw -> {
             importing = false;
             if (webView == null || isFinishing()) return;
             String text = unwrapJsString(raw);
@@ -597,7 +612,7 @@ public class WebShellActivity extends AppCompatActivity {
     private void probeTermStart(TimetableSource src, JwglxtFetcher.Result res, Runnable next) {
         String have = res.timetable.semester.startDate;
         if (school.isEcut() || (have != null && !have.isEmpty())) { next.run(); return; }
-        webView.evaluateJavascript(TermStartProbe.probeJs(src.vendor(), res.timetable.semester.id), raw -> {
+        evaluate(webView, TermStartProbe.probeJs(src.vendor(), res.timetable.semester.id), raw -> {
             if (webView == null || isFinishing()) return;
             String monday = TermStartProbe.detect(unwrapJsString(raw), WeekMath.todayDateLabel());
             DiagLog.log(this, "import", "开学日探测: " + (monday.isEmpty() ? "没找到" : monday));
@@ -655,6 +670,7 @@ public class WebShellActivity extends AppCompatActivity {
                 .setMessage(msg.toString())
                 .setNegativeButton("取消", null)
                 .setPositiveButton("导入", (d, w) -> {
+                    if (!acceptsResult()) return;
                     boolean saved = otherSemester
                             ? SemesterArchive.saveSemester(this, merged, false)
                             : TimetableStore.save(this, merged);
@@ -709,7 +725,7 @@ public class WebShellActivity extends AppCompatActivity {
     /** 读不了的页面：取页面文字交给 AI 转成烫梨指令（零适配兜底）。 */
     private void copyPageForAi() {
         if (webView == null) return;
-        webView.evaluateJavascript(com.ecut.campus.data.PageTextForAi.collectJs(), raw -> {
+        evaluate(webView, com.ecut.campus.data.PageTextForAi.collectJs(), raw -> {
             if (isFinishing()) return;
             String text = unwrapJsString(raw);
             DiagLog.log(this, "import", "交给 AI 读: 页面文字 " + text.length() + " 字 · " + school.diagSummary());
@@ -719,7 +735,7 @@ public class WebShellActivity extends AppCompatActivity {
 
     private void exportPageSample() {
         if (webView == null) return;
-        webView.evaluateJavascript(PageSample.collectJs(), raw -> {
+        evaluate(webView, PageSample.collectJs(), raw -> {
             String sample = PageSample.sanitize(unwrapJsString(raw));
             if (sample.isEmpty()) {
                 Toast.makeText(this, "没能读取页面结构", Toast.LENGTH_SHORT).show();
@@ -790,7 +806,7 @@ public class WebShellActivity extends AppCompatActivity {
                 "`;" +
                 "document.head.appendChild(s);" +
                 "})()";
-        view.evaluateJavascript(js, null);
+        evaluate(view, js, null);
     }
 
     private void retryOnce() {
@@ -861,7 +877,7 @@ public class WebShellActivity extends AppCompatActivity {
         String js = "(function(){var out=[];var as=document.querySelectorAll('a[href]');" +
                 "for(var i=0;i<as.length;i++){out.push(as[i].href);}" +
                 "return JSON.stringify(out);})()";
-        webView.evaluateJavascript(js, value -> {
+        evaluate(webView, js, value -> {
             if (value == null) return;
             Matcher m = PROXY_HOST.matcher(value);
             String last = null;
@@ -896,7 +912,7 @@ public class WebShellActivity extends AppCompatActivity {
                 "(tool&&getComputedStyle(tool).display==='block');" +
                 "return logged?'LOGIN':'GUEST';" +
                 "})()";
-        view.evaluateJavascript(js, raw -> {
+        evaluate(view, js, raw -> {
             String state = unwrapJsString(raw);
             if (!"LOGIN".equals(state)) return;
             Prefs.setPortalSession(this, true);
@@ -944,7 +960,7 @@ public class WebShellActivity extends AppCompatActivity {
                 "}" +
                 "return result;" +
                 "})()";
-        view.evaluateJavascript(js, result -> Log.i(TAG, "EHALL_TARGET: " + result));
+        evaluate(view, js, result -> Log.i(TAG, "EHALL_TARGET: " + result));
     }
 
     private static String jsQuote(String value) {
@@ -996,6 +1012,7 @@ public class WebShellActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        pageGeneration++;
         CookieManager.getInstance().flush();
         if (webView != null) {
             webView.loadUrl("about:blank");

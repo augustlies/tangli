@@ -59,6 +59,16 @@ com.ecut.campus
 
 正方教务的接口需要 aTrust 代理会话，Cookie 与 ticket 在 WebView 里。直接构造 HTTP 请求需要复刻整套握手，且一改版就失效。**复用 WebView 会话是唯一低维护成本方案**：让页面正常加载，然后注入 JS 把 DOM 里的表格读成 JSON。
 
+**网络安全配置**
+
+- 默认信任系统 CA；用户安装的 CA 仅对 `atrust1.ecut.edu.cn` 与 `atrust.ecut.edu.cn`（含代理子域）生效，以保留已验证的 ECUT/aTrust 登录链路。直接办事大厅 `ehall.ecut.edu.cn` 使用系统 CA。
+- 明文 HTTP 仍对 App 开放，因为学校目录和自定义学校网址允许明确配置 HTTP，而且域名在运行时才确定，Android 网络安全配置无法为任意用户学校做动态域名例外。WebShell 的混合内容兼容仅用于 ECUT；自定义学校和学校搜索 WebView 禁止 HTTPS 页面加载 HTTP 子资源。
+- 天气、更新和错误报告客户端使用 HTTPS 地址；校历与校徽抓取使用官网来源链接，校徽会尝试学校首页/图标明确提供的 HTTP 地址。不要添加绕过 TLS 校验的 TrustManager 或主机名验证器。
+
+**课前提醒**
+
+继续使用 `RTC_WAKEUP` + `setAndAllowWhileIdle`（旧版 Android 用 `set`）的不精确闹钟。若八天搜索窗没有课程但学期后段仍有排课，在窗外第一天静默重查；无后续课程时不轮询。相同日期和开始时刻的多门课合并到同一提醒内容中。
+
 **3. 为什么课表要支持手动添加**
 
 实验课、体育课分项、重修班等教务系统经常不收录或不显示。手动添加的课程 `source == "custom"`，同步时**永不删除**。

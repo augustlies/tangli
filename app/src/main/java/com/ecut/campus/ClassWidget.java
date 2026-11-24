@@ -24,6 +24,7 @@ import com.ecut.campus.data.DayPlan;
 import com.ecut.campus.data.Dates;
 import com.ecut.campus.data.WidgetDay;
 import com.ecut.campus.data.WidgetLook;
+import com.ecut.campus.data.ExamCountdown;
 
 import java.util.List;
 
@@ -92,6 +93,11 @@ public final class ClassWidget extends AppWidgetProvider {
             // 添加卡片还开着就由它显示「已添加」，否则弹个 toast
             if (!PinWidgetActivity.onPinned())
                 android.widget.Toast.makeText(c, "已放到桌面", android.widget.Toast.LENGTH_SHORT).show();
+            updateAll(c);
+        } else if (Intent.ACTION_DATE_CHANGED.equals(intent.getAction())
+                || Intent.ACTION_TIME_CHANGED.equals(intent.getAction())
+                || Intent.ACTION_TIMEZONE_CHANGED.equals(intent.getAction())) {
+            Prefs.markWidgetBgRefresh(c);
             updateAll(c);
         }
     }
@@ -325,6 +331,21 @@ public final class ClassWidget extends AppWidgetProvider {
         v.setTextViewText(R.id.w_sub, card.sub);
         v.setViewVisibility(R.id.w_sub, level == WidgetDay.NARROW ? View.GONE : View.VISIBLE);
         v.setTextViewText(R.id.w_note, card.note);
+        ClassPlans.Ctx plans = ClassPlans.load(c);
+        String today = ClassPlans.ymd(System.currentTimeMillis());
+        List<ExamCountdown.Event> allExams = ExamCountdownStore.events(c, plans.t, plans.start, plans.totalWeeks, today);
+        List<ExamCountdown.Event> exams = ExamCountdown.upcoming(allExams, today, ExamCountdown.capacity(level));
+        StringBuilder examText = new StringBuilder();
+        for (ExamCountdown.Event event : exams) {
+            int days = ExamCountdown.remainingDays(today, event.date);
+            if (examText.length() > 0) examText.append("\n");
+            examText.append(event.name).append(" · ").append(days == 0 ? "今天" : days + "天");
+        }
+        if (exams.size() < allExams.size())
+            examText.append(examText.length() == 0 ? "" : "\n").append("还有 ")
+                    .append(allExams.size() - exams.size()).append(" 项");
+        v.setTextViewText(R.id.w_exams, examText.toString());
+        v.setViewVisibility(R.id.w_exams, exams.isEmpty() ? View.GONE : View.VISIBLE);
         v.setViewVisibility(R.id.w_note, card.chips.isEmpty() ? View.VISIBLE : View.GONE);
         v.setViewVisibility(R.id.w_list, card.chips.isEmpty() ? View.GONE : View.VISIBLE);
         if (look != null) {
@@ -336,6 +357,7 @@ public final class ClassWidget extends AppWidgetProvider {
             v.setTextColor(R.id.w_title, ink);
             v.setTextColor(R.id.w_sub, sub);
             v.setTextColor(R.id.w_note, sub);
+            v.setTextColor(R.id.w_exams, ink);
         }
         // 列表：每个小组件一份（高度不同能放的条数不同），主题和背景版本也写进去，变了会换一份新的
         Intent svc = new Intent(c, ClassWidgetService.class)
@@ -394,6 +416,8 @@ public final class ClassWidget extends AppWidgetProvider {
             try {
                 int level = level(c, m, id);
                 int cap = capacity(c, m, id, level);
+                ClassPlans.Ctx plans = ClassPlans.load(c);
+                if (!ExamCountdownStore.events(c, plans.t, plans.start, plans.totalWeeks, ClassPlans.ymd(now)).isEmpty()) cap = Math.max(1, cap - 1);
                 WidgetDay.Card card;
                 try {
                     card = card(c, now, cap, level);

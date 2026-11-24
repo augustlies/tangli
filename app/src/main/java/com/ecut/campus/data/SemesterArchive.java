@@ -10,12 +10,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -25,7 +20,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * 多学期课表归档：filesDir/timetable_semesters.json。
+ * 多学期课表归档：学校目录内的 timetable_semesters.json。
  *
  * 结构：
  *   { schemaVersion, activeSemesterId, timetables: [Timetable...] }
@@ -38,7 +33,6 @@ public final class SemesterArchive {
     public static final int SCHEMA_VERSION = 1;
     private static final String TAG = "SemesterArchive";
     private static final String FILE_NAME = "timetable_semesters.json";
-    private static final String TMP_NAME = "timetable_semesters.json.tmp";
     private static final String KEY_ACTIVE = "activeSemesterId";
 
     private SemesterArchive() {}
@@ -142,6 +136,11 @@ public final class SemesterArchive {
 
     public static String activeSemesterId(Context ctx) {
         return readRoot(ctx).optString(KEY_ACTIVE, "");
+    }
+
+    /** 空 timetables 也是已初始化主源，不能再用旧镜像重建已删除学期。 */
+    static boolean isInitialized(Context ctx) {
+        return readRoot(ctx).optJSONArray("timetables") != null;
     }
 
     public static boolean contains(Context ctx, String semesterId) {
@@ -402,8 +401,12 @@ public final class SemesterArchive {
     }
 
     public static void clear(Context ctx) {
-        new File(ctx.getFilesDir(), FILE_NAME).delete();
-        new File(ctx.getFilesDir(), TMP_NAME).delete();
+        SyncGeneration.invalidate();
+        try {
+            AtomicFileStore.clear(com.ecut.campus.SchoolFiles.file(ctx, FILE_NAME));
+        } catch (Exception e) {
+            Log.e(TAG, "清理本地文件失败", e);
+        }
     }
 
     // ---------- timetable.json 镜像同步 ----------
@@ -444,17 +447,13 @@ public final class SemesterArchive {
             } catch (JSONException ignored) {}
         }
         if (existing == null) {
+            if (root.optJSONArray("timetables") != null) return;
             // 老用户首次启动：镜像就是当前学期，直接建主源条目。
             if (mirror.semester.startDate != null
                     && !mirror.semester.startDate.isEmpty()) {
                 mirror.semester.startDateTouched = true;
             }
-            if (arr.length() == 0) {
-                saveSemesterAsSource(ctx, mirror);
-            } else {
-                // 归档已有其他学期时只追加，不覆盖、不改 active。
-                saveSemester(ctx, mirror, false);
-            }
+            saveSemesterAsSource(ctx, mirror);
             return;
         }
         JSONObject existingJson = null;
@@ -578,11 +577,10 @@ public final class SemesterArchive {
     // ---------- 读写 ----------
 
     private static JSONObject readRoot(Context ctx) {
-        File f = new File(ctx.getFilesDir(), FILE_NAME);
-        if (!f.exists()) return new JSONObject();
-        try (InputStream is = new FileInputStream(f)) {
-            String json = readAll(is);
-            return new JSONObject(json);
+        File f = com.ecut.campus.SchoolFiles.file(ctx, FILE_NAME);
+        try {
+            String json = AtomicFileStore.read(f);
+            return json == null ? new JSONObject() : new JSONObject(json);
         } catch (Exception e) {
             Log.e(TAG, "timetable_semesters.json 读取失败，视为空归档", e);
             return new JSONObject();
@@ -614,36 +612,12 @@ public final class SemesterArchive {
     }
 
     private static boolean writeRoot(Context ctx, JSONObject root) {
-        File dir = ctx.getFilesDir();
-        File tmp = new File(dir, TMP_NAME);
-        File dst = new File(dir, FILE_NAME);
         try {
-            try (FileOutputStream fos = new FileOutputStream(tmp)) {
-                fos.write(root.toString().getBytes(StandardCharsets.UTF_8));
-                fos.flush();
-                fos.getFD().sync();
-            }
-            if (dst.exists() && !dst.delete()) {
-                Log.w(TAG, "旧归档删除失败，继续覆盖");
-            }
-            if (!tmp.renameTo(dst)) {
-                Log.e(TAG, "归档 rename 失败");
-                return false;
-            }
+            AtomicFileStore.write(com.ecut.campus.SchoolFiles.file(ctx, FILE_NAME), root.toString());
             return true;
         } catch (Exception e) {
             Log.e(TAG, "保存归档失败", e);
-            if (tmp.exists()) tmp.delete();
             return false;
-        }
-    }
-
-    private static String readAll(InputStream is) throws Exception {
-        try (InputStream in = is; ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = in.read(buf)) > 0) bos.write(buf, 0, n);
-            return bos.toString("UTF-8");
         }
     }
 

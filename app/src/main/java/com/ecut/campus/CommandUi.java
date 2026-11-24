@@ -410,22 +410,61 @@ final class CommandUi {
             return;
         }
         if (!active) {
-            editor.open(c, s);
+            String semester = TimetableStore.load(a).semester.id;
+            new AlertDialog.Builder(a).setTitle(c.name).setItems(new String[]{"考试倒计时…", "编辑课程"}, (dlg, which) -> {
+                if (which == 0) showExamCountdown(a, c, semester, refresh);
+                else editor.open(c, s);
+            }).show();
             return;
         }
         String head = c.name + " · 第" + week + "周" + Dates.cnDay(s.dayOfWeek) + " "
                 + (s.hasCustomTime() ? s.timeStart + "-" + s.timeEnd : s.startSection + "-" + s.endSection + "节");
         boolean hasNote = c.note != null && !c.note.isEmpty();
         String noteItem = hasNote ? "备注：" + (c.note.length() > 16 ? c.note.substring(0, 16) + "…" : c.note) : "写备注…";
-        new AlertDialog.Builder(a)
-                .setTitle(head)
-                .setItems(new String[]{"仅本周停课", "调到其他时间…", noteItem, "编辑课程"}, (dlg, which) -> {
-                    if (which == 0) cancelOnce(a, c, s, week, refresh);
-                    else if (which == 1) showMoveDialog(a, c, s, week, refresh);
-                    else if (which == 2) showNoteDialog(a, c, refresh);
-                    else editor.open(c, s);
-                })
-                .show();
+        String semester = TimetableStore.load(a).semester.id;
+        String[] items = {"仅本周停课", "调到其他时间…", noteItem, "考试倒计时…", "编辑课程"};
+        new AlertDialog.Builder(a).setTitle(head).setItems(items, (dlg, which) -> {
+            if (which == 0) cancelOnce(a, c, s, week, refresh);
+            else if (which == 1) showMoveDialog(a, c, s, week, refresh);
+            else if (which == 2) showNoteDialog(a, c, refresh);
+            else if (which == 3) showExamCountdown(a, c, semester, refresh);
+            else editor.open(c, s);
+        }).show();
+    }
+
+    private static void showExamCountdown(Activity a, Timetable.Course c, String semester, Runnable refresh) {
+        com.ecut.campus.data.ExamCountdown.Event old = ExamCountdownStore.get(a, semester, c.key);
+        android.widget.LinearLayout wrap = new android.widget.LinearLayout(a);
+        wrap.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int pad = Math.round(20 * a.getResources().getDisplayMetrics().density);
+        wrap.setPadding(pad, 0, pad, 0);
+        EditText name = new EditText(a); name.setSingleLine(true); name.setHint("显示名称");
+        name.setText(old == null ? c.name : old.name); wrap.addView(name);
+        android.widget.Button date = new android.widget.Button(a);
+        String[] selected = {old == null ? "" : old.date};
+        date.setText(selected[0].isEmpty() ? "选择考试日期" : selected[0]); wrap.addView(date);
+        date.setOnClickListener(v -> {
+            java.util.Calendar cal = java.util.Calendar.getInstance();
+            if (com.ecut.campus.data.Dates.valid(selected[0])) {
+                String[] p = selected[0].split("-"); cal.set(Integer.parseInt(p[0]), Integer.parseInt(p[1])-1, Integer.parseInt(p[2]));
+            }
+            new android.app.DatePickerDialog(a, (picker, y, m, d) -> {
+                selected[0] = String.format(java.util.Locale.US, "%04d-%02d-%02d", y, m+1, d);
+                date.setText(selected[0]);
+            }, cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH), cal.get(java.util.Calendar.DAY_OF_MONTH)).show();
+        });
+        AlertDialog.Builder builder = new AlertDialog.Builder(a).setTitle("考试倒计时").setView(wrap)
+                .setNegativeButton("取消", null).setPositiveButton("保存", (dlg, w) -> {
+                    if (selected[0].isEmpty() || name.getText().toString().trim().isEmpty()
+                            || !ExamCountdownStore.save(a, semester, c.key, name.getText().toString(), selected[0])) {
+                        Toast.makeText(a, "请填写名称和日期", Toast.LENGTH_SHORT).show(); return;
+                    }
+                    ClassWidget.updateAll(a); if (refresh != null) refresh.run();
+                });
+        if (old != null) builder.setNeutralButton("清除", (dlg, w) -> {
+            ExamCountdownStore.clear(a, semester, c.key); ClassWidget.updateAll(a); if (refresh != null) refresh.run();
+        });
+        builder.show();
     }
 
     /** 课程备注（作业、带什么、提醒）：同名课程共用一条，课块右上角显示小点。 */

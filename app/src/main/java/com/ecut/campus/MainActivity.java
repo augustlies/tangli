@@ -509,15 +509,6 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
         return sb;
     }
 
-    /** 课表超过 3 天没同步时，在副标题后提示一句。 */
-    private String staleHint() {
-        if (Prefs.sessionExpired(this)) return "  ·  登录已过期";
-        long at = Prefs.timetableSyncedAt(this);
-        if (at <= 0) return "";
-        long days = (System.currentTimeMillis() - at) / 86_400_000L;
-        return days >= 3 ? "  ·  " + days + " 天前同步" : "";
-    }
-
     private void refreshStatus() {
         if (adblock != null) adblock.refreshStatus();
     }
@@ -563,7 +554,8 @@ public class MainActivity extends AppCompatActivity implements AppActions.Host {
                             : (week != actualCurrentWeek() ? "本周是第 " + actualCurrentWeek() + " 周 · " : ""))
                             + WeekMath.weekRangeLabel(start, week)
                             + (startFromCalendar ? "  ·  按校历" : "")
-                            + staleHint());
+                            + (Prefs.sessionExpired(this) ? "  ·  登录已过期" : "")
+                    );
         }
 
         if (timetableView != null) {

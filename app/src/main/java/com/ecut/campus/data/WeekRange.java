@@ -20,6 +20,10 @@ import java.util.List;
  */
 public final class WeekRange {
 
+    /** The project and TangliCommand support courses through week 99. */
+    public static final int MAX_WEEK = 99;
+    private static final int MAX_EXPRESSION_CHARS = 4096;
+
     private WeekRange() {}
 
     /** 解析结果 */
@@ -64,6 +68,11 @@ public final class WeekRange {
      * @return 永不为 null；解析失败时 {@link Parsed#ok()} 为 false
      */
     public static Parsed parse(String expr) {
+        if (expr != null && expr.length() > MAX_EXPRESSION_CHARS) {
+            // Bound both transient work and retained diagnostics before trim/copying the full input.
+            String prefix = expr.substring(0, MAX_EXPRESSION_CHARS).trim();
+            return new Parsed(new ArrayList<>(), false, null, prefix);
+        }
         String raw = expr == null ? "" : expr.trim();
         if (raw.isEmpty()) return new Parsed(new ArrayList<>(), false, null, raw);
 
@@ -108,12 +117,16 @@ public final class WeekRange {
                 Integer b = toInt(part.substring(dash + 1));
                 if (a == null || b == null) continue;
                 if (a > b) { int t = a; a = b; b = t; } // 容错：写反了也认
-                if (b - a > 60) continue;              // 异常区间，丢弃
-                for (int w = a; w <= b; w++) addDistinct(result, w);
+                if (a < 1 || b > MAX_WEEK || b - a > MAX_WEEK - 1) continue;
+                // End explicitly at b so incrementing can never wrap and keep looping.
+                for (int w = a; ; w++) {
+                    addDistinct(result, w);
+                    if (w == b) break;
+                }
             } else {
                 // 单值 a，或形如 "5-" / "-5" 的残缺写法
                 Integer a = toInt(part.replace("-", ""));
-                if (a != null && a > 0 && a <= 60) addDistinct(result, a);
+                if (a != null && a > 0 && a <= MAX_WEEK) addDistinct(result, a);
             }
         }
 
@@ -149,7 +162,7 @@ public final class WeekRange {
     }
 
     private static void addDistinct(List<Integer> list, int v) {
-        if (v <= 0 || v > 60) return;
+        if (v <= 0 || v > MAX_WEEK) return;
         if (!list.contains(v)) list.add(v);
     }
 
@@ -168,8 +181,9 @@ public final class WeekRange {
         int runStart = s.get(0);
         int prev = runStart;
         for (int i = 1; i <= s.size(); i++) {
-            int cur = (i < s.size()) ? s.get(i) : Integer.MIN_VALUE;
-            if (cur == prev + 1) {
+            boolean atEnd = i == s.size();
+            int cur = atEnd ? 0 : s.get(i);
+            if (!atEnd && prev != Integer.MAX_VALUE && cur == prev + 1) {
                 prev = cur;
                 continue;
             }
@@ -177,7 +191,7 @@ public final class WeekRange {
             if (sb.length() > 0) sb.append(',');
             if (runStart == prev) sb.append(runStart);
             else sb.append(runStart).append('-').append(prev);
-            if (cur != Integer.MIN_VALUE) {
+            if (!atEnd) {
                 runStart = cur;
                 prev = cur;
             }

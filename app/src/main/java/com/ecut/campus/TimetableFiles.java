@@ -69,12 +69,20 @@ final class TimetableFiles {
             if (is != null) {
                 byte[] buf = new byte[8192];
                 int n;
-                while ((n = is.read(buf)) > 0) bos.write(buf, 0, n);
+                while ((n = is.read(buf)) > 0) {
+                    if (bos.size() > TimetableStore.MAX_IMPORT_CHARS - n) {
+                        throw new java.io.IOException("课表文件超过大小限制");
+                    }
+                    bos.write(buf, 0, n);
+                }
             }
             String json = bos.toString("UTF-8");
             Timetable imported = TimetableStore.importJson(json);
-            Timetable merged = TimetableStore.merge(TimetableStore.load(a), imported);
-            TimetableStore.save(a, merged);
+            Timetable merged = TimetableStore.mergeImport(TimetableStore.load(a), imported);
+            if (!TimetableStore.save(a, merged)) {
+                throw new java.io.IOException("课表保存失败，请重试");
+            }
+            ClassWidget.updateAll(a.getApplicationContext());
             Toast.makeText(a, "导入成功：共 " + merged.courses.size() + " 门课程",
                     Toast.LENGTH_SHORT).show();
             return true;
