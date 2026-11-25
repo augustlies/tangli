@@ -7,10 +7,12 @@ import static org.junit.Assert.*;
 public class ExamCountdownTest {
     @Test public void recognizesExamNamesButNotGenericExamType() {
         for (String s : Arrays.asList("期中考试", "随堂测验", "实验检测", "CET-4", "大学英语四六级", "全国计算机等级考试",
-                "计算机二级", "大学英语四级考试", "考研英语", "研究生入学考试", "国考", "国家公务员考试", "普通话水平测试"))
+                "计算机二级", "NCRE" , "NCRE二级考试", "四级", "六级", "英语四级", "英语六级", "CET-6", "大学英语四级考试", "考研英语", "研究生入学考试", "国考", "国家公务员考试", "普通话水平测试"))
             assertTrue(s, ExamCountdown.isExam(s));
         assertFalse(ExamCountdown.isExam("考试"));
         assertFalse(ExamCountdown.isExam("高等数学"));
+        assertFalse(ExamCountdown.isExam("faceted learning"));
+        assertFalse(ExamCountdown.isExam("NCRE备考课程"));
     }
     @Test public void findsUpcomingSessionByWeekAndDayAndHonorsSemesterEnd() {
         Timetable t = new Timetable(); t.semester.startDate = "2026-08-31"; t.semester.totalWeeks = 3;
@@ -32,5 +34,16 @@ public class ExamCountdownTest {
         assertEquals(1,ExamCountdown.capacity(WidgetDay.NARROW));
         assertEquals(1,ExamCountdown.capacity(WidgetDay.MID));
         assertEquals(2,ExamCountdown.capacity(WidgetDay.WIDE));
+    }
+    @Test public void filtersByMaxDaysAndHiddenIds() {
+        java.util.List<ExamCountdown.Event> all = Arrays.asList(
+                new ExamCountdown.Event("sem|a", "计算机二级", "2026-11-28"),
+                new ExamCountdown.Event("sem|b", "大学英语四级", "2026-12-12"),
+                new ExamCountdown.Event("sem|c", "考研", "2026-12-25")
+        );
+        java.util.Set<String> hidden = new java.util.HashSet<>(Arrays.asList("sem|a"));
+        java.util.List<ExamCountdown.Event> onlyB = ExamCountdown.upcoming(all, "2026-11-24", 10, 20, hidden);
+        assertEquals(1, onlyB.size());
+        assertEquals("大学英语四级", onlyB.get(0).name);
     }
 }

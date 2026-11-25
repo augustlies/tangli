@@ -293,4 +293,28 @@ public final class Prefs {
             return null;
         }
     }
+
+    // ===== 1.4.1：桌面组件考试倒计时设置 =====
+    /** 是否在桌面小组件底栏提示考试倒计时，默认开启。 */
+    public static boolean widgetExamEnabled(Context ctx) { return sp(ctx).getBoolean("widget_exam_enabled", true); }
+    public static void setWidgetExamEnabled(Context ctx, boolean on) { sp(ctx).edit().putBoolean("widget_exam_enabled", on).apply(); }
+    /** 考前多少天内才显示在桌面组件（0 = 不限天数，有考试就显示）。 */
+    public static int widgetExamLeadDays(Context ctx) {
+        int v = sp(ctx).getInt("widget_exam_lead_days", 0);
+        return v <= 0 ? 0 : Math.min(365, v);
+    }
+    public static void setWidgetExamLeadDays(Context ctx, int days) {
+        int v = days <= 0 ? 0 : Math.min(365, days);
+        sp(ctx).edit().putInt("widget_exam_lead_days", v).apply();
+    }
+    /** 多场考试轮播切换间隔秒数（默认 6 秒；0 = 不自动切换）。 */
+    public static int widgetExamFlipSeconds(Context ctx) {
+        int v = sp(ctx).getInt("widget_exam_flip_seconds", 6);
+        if (v == 0) return 0;
+        return Math.max(3, Math.min(60, v));
+    }
+    public static void setWidgetExamFlipSeconds(Context ctx, int sec) {
+        int v = sec <= 0 ? 0 : Math.max(3, Math.min(60, sec));
+        sp(ctx).edit().putInt("widget_exam_flip_seconds", v).apply();
+    }
 }

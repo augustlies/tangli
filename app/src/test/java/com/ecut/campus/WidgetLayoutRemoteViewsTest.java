@@ -45,6 +45,8 @@ public class WidgetLayoutRemoteViewsTest {
         names.add("widget_class_item");
         names.add("widget_classes");
         names.add("widget_classes_loading");
+        names.add("widget_exam_flipper");
+        names.add("widget_exam_page");
         return new ArrayList<>(names);
     }
 
@@ -92,5 +94,36 @@ public class WidgetLayoutRemoteViewsTest {
         String item = read("src/main/res/layout/widget_class_item.xml");
         assertTrue(item.contains("<Chronometer\n                android:id=\"@+id/wi_cd_live\""));
         assertTrue(item.contains("<Chronometer\n                android:id=\"@+id/wi_cd_soon\""));
+    }
+
+    @Test
+    public void examFlipperHasStaticFallbackAndProgressBar() throws Exception {
+        String flipper = read("src/main/res/layout/widget_exam_flipper.xml");
+        assertTrue(flipper.contains("android:flipInterval=\"6000\""));
+        assertTrue(flipper.contains("@anim/widget_exam_in"));
+        String page = read("src/main/res/layout/widget_exam_page.xml");
+        assertTrue(page.contains("@+id/w_exam_bg"));
+        assertTrue(page.contains("@+id/w_exam_badge_bg"));
+        assertTrue(page.contains("@+id/w_exam_bar"));
+        assertTrue(page.contains("@+id/w_exam_name"));
+        assertTrue(page.contains("@+id/w_exam_day"));
+        String java = read("src/main/java/com/ecut/campus/ClassWidget.java");
+        assertTrue(java.contains("if (exams.size() > 1 && flipSeconds > 0 && examMotionEnabled(c))"));
+        assertTrue(java.contains("setFlipInterval"));
+        assertTrue(java.contains("v.addView(R.id.w_exam_panel, firstPage)"));
+        assertTrue(java.contains("setTextViewText(R.id.w_exam_name, event.name)"));
+    }
+
+    @Test
+    public void examPageAvoidsWireframeAndLeakedLabels() throws Exception {
+        String page = read("src/main/res/layout/widget_exam_page.xml");
+        assertFalse(page.contains("w_exam_sheet"));
+        assertFalse(page.contains("w_exam_tick_"));
+        assertFalse(page.contains("w_exam_step"));
+        String java = read("src/main/java/com/ecut/campus/ClassWidget.java");
+        assertFalse(java.contains("七日刻度外"));
+        assertFalse(java.contains("七格刻度"));
+        assertFalse(java.contains("临考刻度"));
+        assertFalse(java.contains("otherEvents.append(\" · \")"));
     }
 }

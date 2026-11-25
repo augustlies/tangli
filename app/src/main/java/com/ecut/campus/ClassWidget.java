@@ -8,9 +8,14 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.style.ForegroundColorSpan;
@@ -208,9 +213,12 @@ public final class ClassWidget extends AppWidgetProvider {
     }
 
     static WidgetDay.Card card(Context c, long now, int cap, int level) {
+        return card(c, now, cap, level, ClassPlans.load(c));
+    }
+
+    private static WidgetDay.Card card(Context c, long now, int cap, int level, ClassPlans.Ctx x) {
         String ymd = ClassPlans.ymd(now);
         int nowMin = ClassPlans.nowMinutes(now);
-        ClassPlans.Ctx x = ClassPlans.load(c);
         int week = Dates.valid(x.start) ? Dates.weekOf(x.start, ymd) : 0;
         int state = state(x, week);
         List<DayPlan.Item> today = state == WidgetDay.OK ? ClassPlans.day(x, ymd) : null;
@@ -310,7 +318,7 @@ public final class ClassWidget extends AppWidgetProvider {
 
     /** 一个小组件的整张 RemoteViews。photoLong > 0 时用自选背景图（长边像素上限）。 */
     private static RemoteViews view(Context c, AppWidgetManager m, int id, WidgetDay.Card card, int cap, int level,
-                                    int theme, boolean night, int photoLong) {
+                                    int theme, boolean night, int photoLong, List<ExamCountdown.Event> allExams) {
         RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget_classes);
         WidgetBg.Look look = photoLong > 0
                 ? WidgetBg.compose(c, WidgetBg.sizeDp(m, id), night, Prefs.widgetMask(c), photoLong,
@@ -331,21 +339,30 @@ public final class ClassWidget extends AppWidgetProvider {
         v.setTextViewText(R.id.w_sub, card.sub);
         v.setViewVisibility(R.id.w_sub, level == WidgetDay.NARROW ? View.GONE : View.VISIBLE);
         v.setTextViewText(R.id.w_note, card.note);
-        ClassPlans.Ctx plans = ClassPlans.load(c);
         String today = ClassPlans.ymd(System.currentTimeMillis());
-        List<ExamCountdown.Event> allExams = ExamCountdownStore.events(c, plans.t, plans.start, plans.totalWeeks, today);
-        List<ExamCountdown.Event> exams = ExamCountdown.upcoming(allExams, today, ExamCountdown.capacity(level));
-        StringBuilder examText = new StringBuilder();
-        for (ExamCountdown.Event event : exams) {
-            int days = ExamCountdown.remainingDays(today, event.date);
-            if (examText.length() > 0) examText.append("\n");
-            examText.append(event.name).append(" · ").append(days == 0 ? "今天" : days + "天");
+        List<ExamCountdown.Event> exams = ExamCountdown.upcoming(allExams, today, Math.min(4, allExams.size()));
+        boolean hasExam = !exams.isEmpty();
+        v.removeAllViews(R.id.w_exam_panel);
+        v.setViewVisibility(R.id.w_exam_panel, hasExam ? View.VISIBLE : View.GONE);
+        if (hasExam) {
+            boolean lightBg = look != null ? look.darkText : !night;
+            int flipSeconds = Prefs.widgetExamFlipSeconds(c);
+            RemoteViews firstPage = examPage(c, exams, 0, allExams.size(), level, today,
+                    ink, sub, accent, lightBg, ca);
+            if (exams.size() > 1 && flipSeconds > 0 && examMotionEnabled(c)) {
+                RemoteViews carousel = new RemoteViews(c.getPackageName(), R.layout.widget_exam_flipper);
+                carousel.setInt(R.id.w_exam_flipper, "setFlipInterval", flipSeconds * 1000);
+                carousel.addView(R.id.w_exam_flipper, firstPage);
+                for (int index = 1; index < exams.size(); index++) {
+                    carousel.addView(R.id.w_exam_flipper,
+                            examPage(c, exams, index, allExams.size(), level, today,
+                                    ink, sub, accent, lightBg, ca));
+                }
+                v.addView(R.id.w_exam_panel, carousel);
+            } else {
+                v.addView(R.id.w_exam_panel, firstPage);
+            }
         }
-        if (exams.size() < allExams.size())
-            examText.append(examText.length() == 0 ? "" : "\n").append("还有 ")
-                    .append(allExams.size() - exams.size()).append(" 项");
-        v.setTextViewText(R.id.w_exams, examText.toString());
-        v.setViewVisibility(R.id.w_exams, exams.isEmpty() ? View.GONE : View.VISIBLE);
         v.setViewVisibility(R.id.w_note, card.chips.isEmpty() ? View.VISIBLE : View.GONE);
         v.setViewVisibility(R.id.w_list, card.chips.isEmpty() ? View.GONE : View.VISIBLE);
         if (look != null) {
@@ -357,7 +374,6 @@ public final class ClassWidget extends AppWidgetProvider {
             v.setTextColor(R.id.w_title, ink);
             v.setTextColor(R.id.w_sub, sub);
             v.setTextColor(R.id.w_note, sub);
-            v.setTextColor(R.id.w_exams, ink);
         }
         // 列表：每个小组件一份（高度不同能放的条数不同），主题和背景版本也写进去，变了会换一份新的
         Intent svc = new Intent(c, ClassWidgetService.class)
@@ -389,6 +405,107 @@ public final class ClassWidget extends AppWidgetProvider {
         return v;
     }
 
+    private static boolean examMotionEnabled(Context context) {
+        try {
+            if (Settings.Global.getFloat(context.getContentResolver(), Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f)
+                return false;
+            PowerManager power = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+            return power == null || !power.isPowerSaveMode();
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private static RemoteViews examPage(Context context, List<ExamCountdown.Event> events, int index, int total,
+                                        int level, String today, int ink, int sub, int accent,
+                                        boolean lightBg, int chipAlpha) {
+        RemoteViews page = new RemoteViews(context.getPackageName(), R.layout.widget_exam_page);
+        ExamCountdown.Event event = events.get(index);
+        int days = Math.max(0, ExamCountdown.remainingDays(today, event.date));
+        boolean urgent = days <= 7;
+
+        int cardBg = urgent
+                ? (lightBg ? 0xFFF9EAE4 : 0xFF34231D)
+                : (lightBg ? 0xFFECEAE3 : 0xFF282825);
+        int badgeBg = urgent ? accent : (lightBg ? 0xFFE0DDD4 : 0xFF363632);
+        int badgeText = urgent ? 0xFFFBFAF7 : ink;
+
+        page.setInt(R.id.w_exam_bg, "setColorFilter", cardBg);
+        page.setInt(R.id.w_exam_bg, "setImageAlpha", chipAlpha);
+        page.setInt(R.id.w_exam_badge_bg, "setColorFilter", badgeBg);
+        if (chipAlpha < 255) {
+            page.setInt(R.id.w_exam_badge_bg, "setImageAlpha", Math.min(255, chipAlpha + 25));
+        }
+
+        page.setTextViewText(R.id.w_exam_name, event.name);
+        page.setTextColor(R.id.w_exam_name, ink);
+
+        if (events.size() > 1 && level != WidgetDay.NARROW) {
+            page.setTextViewText(R.id.w_exam_index, (index + 1) + "/" + events.size());
+            page.setTextColor(R.id.w_exam_index, sub);
+            page.setViewVisibility(R.id.w_exam_index, View.VISIBLE);
+        } else {
+            page.setViewVisibility(R.id.w_exam_index, View.GONE);
+        }
+
+        page.setTextViewText(R.id.w_exam_day, days == 0 ? "今天" : Integer.toString(days));
+        page.setTextColor(R.id.w_exam_day, badgeText);
+        page.setTextColor(R.id.w_exam_unit, urgent ? 0xFFFBFAF7 : sub);
+        page.setViewVisibility(R.id.w_exam_unit, days == 0 ? View.GONE : View.VISIBLE);
+
+        StringBuilder otherEvents = new StringBuilder();
+        if (events.size() > 1) {
+            int nextIndex = (index + 1) % events.size();
+            ExamCountdown.Event next = events.get(nextIndex);
+            int nextDays = Math.max(0, ExamCountdown.remainingDays(today, next.date));
+            otherEvents.append(nextIndex == 0 ? "最近 " : "下一场 ")
+                    .append(next.name).append(' ')
+                    .append(nextDays == 0 ? "今天" : nextDays + "天");
+            if (total > events.size()) {
+                otherEvents.append("  还有 ").append(total - events.size()).append(" 场");
+            }
+        }
+        boolean showNext = events.size() > 1 && level != WidgetDay.NARROW;
+        page.setTextViewText(R.id.w_exam_next, otherEvents.toString());
+        page.setTextColor(R.id.w_exam_next, sub);
+        page.setViewVisibility(R.id.w_exam_next, showNext ? View.VISIBLE : View.GONE);
+
+        float progress = days == 0 ? 1.0f : (days <= 30 ? Math.max(0.12f, (30f - days) / 30f) : 0.08f);
+        int trackColor = withAlpha(ink, lightBg ? 26 : 36);
+        int fillColor = urgent ? accent : withAlpha(ink, lightBg ? 120 : 140);
+        page.setImageViewBitmap(R.id.w_exam_bar, examProgressBar(context, trackColor, fillColor, progress, urgent));
+
+        String description = event.name + "，" + event.date + "，" + (days == 0 ? "今天" : days + "天后");
+        if (otherEvents.length() > 0) description += "；" + otherEvents;
+        page.setContentDescription(R.id.w_exam_page, description);
+        return page;
+    }
+
+    private static Bitmap examProgressBar(Context context, int trackColor, int fillColor,
+                                          float progress, boolean urgent) {
+        float d = context.getResources().getDisplayMetrics().density;
+        int width = Math.max(240, Math.round(280 * d));
+        int height = Math.max(6, Math.round(4 * d));
+        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        float r = height / 2f;
+        paint.setColor(trackColor);
+        canvas.drawRoundRect(0, 0, width, height, r, r, paint);
+        float fillW = Math.max(height, Math.min(width, width * progress));
+        paint.setColor(fillColor);
+        canvas.drawRoundRect(0, 0, fillW, height, r, r, paint);
+        if (urgent && fillW > height * 1.5f) {
+            paint.setColor(0x80FFFFFF);
+            canvas.drawCircle(fillW - r, r, r * 0.42f, paint);
+        }
+        return bitmap;
+    }
+
+    private static int withAlpha(int color, int alpha) {
+        return (color & 0x00ffffff) | (alpha << 24);
+    }
+
     /** 兜底：任何一步出错也推一个能显示的占位（「烫梨 · 今日课程」），不让桌面停在空白方块。 */
     static RemoteViews fallback(Context c) {
         RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget_classes_loading);
@@ -411,16 +528,24 @@ public final class ClassWidget extends AppWidgetProvider {
             photo = WidgetBg.active(c);
         } catch (Throwable ignored) {
         }
+        ClassPlans.Ctx sharedPlans = null;
+        List<ExamCountdown.Event> allExams = java.util.Collections.emptyList();
+        try {
+            sharedPlans = ClassPlans.load(c);
+            allExams = ExamCountdownStore.events(c, sharedPlans.t, sharedPlans.start,
+                    sharedPlans.totalWeeks, ClassPlans.ymd(now));
+        } catch (Exception ignored) {
+        }
         for (int id : ids) {
             boolean done = false;
             try {
                 int level = level(c, m, id);
                 int cap = capacity(c, m, id, level);
-                ClassPlans.Ctx plans = ClassPlans.load(c);
-                if (!ExamCountdownStore.events(c, plans.t, plans.start, plans.totalWeeks, ClassPlans.ymd(now)).isEmpty()) cap = Math.max(1, cap - 1);
+                if (!allExams.isEmpty()) cap = Math.max(1, cap - 1);
                 WidgetDay.Card card;
                 try {
-                    card = card(c, now, cap, level);
+                    card = sharedPlans == null ? card(c, now, cap, level)
+                            : card(c, now, cap, level, sharedPlans);
                 } catch (Exception e) {
                     card = new WidgetDay.Card();
                     card.title = "今日课程";
@@ -430,7 +555,7 @@ public final class ClassWidget extends AppWidgetProvider {
                 int[] tries = photo ? new int[]{WidgetBg.FULL, 480, 0} : new int[]{0};
                 for (int t = 0; t < tries.length && !done; t++) {
                     try { // 位图每个小组件现解码、用完即弃
-                        m.updateAppWidget(id, view(c, m, id, card, cap, level, theme, night, tries[t]));
+                        m.updateAppWidget(id, view(c, m, id, card, cap, level, theme, night, tries[t], allExams));
                         done = true;
                     } catch (Throwable ignored) {
                     }

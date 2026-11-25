@@ -146,7 +146,7 @@ public final class PinWidgetActivity extends AppCompatActivity {
     private void bindWidget() {
         ((ImageView) findViewById(R.id.pin_preview)).setImageResource(
                 R.drawable.widget_classes_preview);
-        ((TextView) findViewById(R.id.pin_name)).setText("今日课程 · 4×2，可拉成 2×2");
+        ((TextView) findViewById(R.id.pin_name)).setText("今日课程（4×2，可拉成 2×2）");
     }
 
     /** 默认桌面会忽略放置请求吗（包名在名单里，或厂商是 vivo / iQOO）。 */

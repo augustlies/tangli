@@ -59,10 +59,14 @@ final class SettingsTab {
         View funRow = settingsFragment.findViewById(R.id.row_settings_fun);
         if (funRow != null) funRow.setOnClickListener(v ->
                 a.startActivity(new Intent(a, com.ecut.campus.fun.FunActivity.class)));
+        View widgetRow = settingsFragment.findViewById(R.id.row_settings_widget_page);
+        if (widgetRow != null) widgetRow.setOnClickListener(v -> showPage(R.id.settings_page_widget));
         View genRow = settingsFragment.findViewById(R.id.row_settings_general_page);
         if (genRow != null) genRow.setOnClickListener(v -> showPage(R.id.settings_page_general));
         View backTt = settingsFragment.findViewById(R.id.btn_settings_back_tt);
         if (backTt != null) backTt.setOnClickListener(v -> showPage(R.id.settings_page_root));
+        View backWidget = settingsFragment.findViewById(R.id.btn_settings_back_widget);
+        if (backWidget != null) backWidget.setOnClickListener(v -> showPage(R.id.settings_page_root));
         View backGen = settingsFragment.findViewById(R.id.btn_settings_back_general);
         if (backGen != null) backGen.setOnClickListener(v -> showPage(R.id.settings_page_root));
         View icsRow = settingsFragment.findViewById(R.id.row_export_ics);
@@ -186,7 +190,7 @@ final class SettingsTab {
     }
 
     void showPage(int pageId, boolean animate) {
-        int[] pages = {R.id.settings_page_root, R.id.settings_page_timetable, R.id.settings_page_general};
+        int[] pages = {R.id.settings_page_root, R.id.settings_page_timetable, R.id.settings_page_widget, R.id.settings_page_general};
         boolean forward = pageId != R.id.settings_page_root;
         for (int id : pages) {
             View p = settingsFragment.findViewById(id);
@@ -208,6 +212,7 @@ final class SettingsTab {
             }
         }
         settingsPage = pageId;
+        if (pageId == R.id.settings_page_widget) { renderWidgetBg(); renderWidgetExamSettings(); }
         View scroll = settingsFragment.findViewById(R.id.settings_scroll);
         if (scroll != null) {
             scroll.scrollTo(0, 0);
@@ -492,7 +497,229 @@ final class SettingsTab {
                 }
             });
         }
+        bindWidgetExamSettings();
         renderWidgetBg();
+        renderWidgetExamSettings();
+    }
+
+    private void bindWidgetExamSettings() {
+        com.google.android.material.materialswitch.MaterialSwitch sw =
+                settingsFragment.findViewById(R.id.switch_widget_exam_enabled);
+        View rowEnable = settingsFragment.findViewById(R.id.row_widget_exam_enabled);
+        if (sw != null) {
+            sw.setOnCheckedChangeListener(null);
+            sw.setChecked(Prefs.widgetExamEnabled(a));
+            sw.setOnCheckedChangeListener((b, on) -> {
+                Prefs.setWidgetExamEnabled(a, on);
+                ClassWidget.updateAll(a.getApplicationContext());
+                renderWidgetExamSettings();
+            });
+            if (rowEnable != null) rowEnable.setOnClickListener(v -> sw.toggle());
+        }
+        View filterRow = settingsFragment.findViewById(R.id.row_widget_exam_filter);
+        if (filterRow != null) filterRow.setOnClickListener(v -> showExamFilterDialog());
+        View leadRow = settingsFragment.findViewById(R.id.row_widget_exam_lead);
+        if (leadRow != null) leadRow.setOnClickListener(v -> showExamLeadDialog());
+        View intervalRow = settingsFragment.findViewById(R.id.row_widget_exam_interval);
+        if (intervalRow != null) intervalRow.setOnClickListener(v -> showExamIntervalDialog());
+    }
+
+    private void renderWidgetExamSettings() {
+        boolean on = Prefs.widgetExamEnabled(a);
+        com.google.android.material.materialswitch.MaterialSwitch sw =
+                settingsFragment.findViewById(R.id.switch_widget_exam_enabled);
+        if (sw != null && sw.isChecked() != on) sw.setChecked(on);
+        TextView enabledSub = settingsFragment.findViewById(R.id.tv_widget_exam_enabled_sub);
+        if (enabledSub != null) {
+            enabledSub.setText(on ? "在小组件底栏提示近期考试与测验" : "已关闭，不占用小组件底部空间");
+        }
+        View filterRow = settingsFragment.findViewById(R.id.row_widget_exam_filter);
+        View leadRow = settingsFragment.findViewById(R.id.row_widget_exam_lead);
+        View intervalRow = settingsFragment.findViewById(R.id.row_widget_exam_interval);
+        for (View row : new View[]{filterRow, leadRow, intervalRow}) {
+            if (row == null) continue;
+            row.setEnabled(on);
+            row.setAlpha(on ? 1f : 0.45f);
+        }
+
+        ClassPlans.Ctx plans = ClassPlans.load(a);
+        String today = ClassPlans.ymd(System.currentTimeMillis());
+        java.util.List<com.ecut.campus.data.ExamCountdown.Event> candidates =
+                ExamCountdownStore.allCandidates(a, plans.t, plans.start, plans.totalWeeks, today);
+        java.util.Set<String> hidden = ExamCountdownStore.hiddenIds(a);
+        int selectedCount = 0;
+        for (com.ecut.campus.data.ExamCountdown.Event e : candidates) {
+            if (!hidden.contains(e.id)) selectedCount++;
+        }
+        TextView filterSub = settingsFragment.findViewById(R.id.tv_widget_exam_filter_sub);
+        if (filterSub != null) {
+            if (candidates.isEmpty()) {
+                filterSub.setText("当前课表暂无考试，长按课表卡片可手动添加");
+            } else if (selectedCount == candidates.size()) {
+                filterSub.setText("全部已检测考试（共 " + candidates.size() + " 场）");
+            } else if (selectedCount == 0) {
+                filterSub.setText("已全部取消勾选，小组件不显示考试");
+            } else {
+                filterSub.setText("已选 " + selectedCount + " / " + candidates.size() + " 场");
+            }
+        }
+
+        int leadDays = Prefs.widgetExamLeadDays(a);
+        TextView leadSub = settingsFragment.findViewById(R.id.tv_widget_exam_lead_sub);
+        if (leadSub != null) {
+            leadSub.setText(leadDays == 0 ? "不限天数（有考试就显示）" : "考前 " + leadDays + " 天内才显示");
+        }
+
+        int flipSec = Prefs.widgetExamFlipSeconds(a);
+        TextView intervalSub = settingsFragment.findViewById(R.id.tv_widget_exam_interval_sub);
+        if (intervalSub != null) {
+            intervalSub.setText(flipSec == 0 ? "不自动切换（只看最近一场）" : "每 " + flipSec + " 秒切换一次");
+        }
+
+        TextView entrySub = settingsFragment.findViewById(R.id.tv_settings_widget_page_sub);
+        if (entrySub != null) {
+            int placed = ClassWidget.placedCount(a);
+            String prefix = placed > 0 ? "已放 " + placed + " 个，" : "";
+            String tail = on ? (leadDays == 0 ? "考试倒计时开启" : "考前 " + leadDays + " 天提醒") : "考试倒计时已关";
+            entrySub.setText(prefix + tail);
+        }
+    }
+
+    private void showExamFilterDialog() {
+        ClassPlans.Ctx plans = ClassPlans.load(a);
+        String today = ClassPlans.ymd(System.currentTimeMillis());
+        java.util.List<com.ecut.campus.data.ExamCountdown.Event> candidates =
+                ExamCountdownStore.allCandidates(a, plans.t, plans.start, plans.totalWeeks, today);
+        if (candidates.isEmpty()) {
+            new AlertDialog.Builder(a)
+                    .setTitle("显示的考试")
+                    .setMessage("当前课表没有检测到四六级、计算机二级、考研、国考、普通话或期末等考试，长按课表上的任意课程卡片也能手动设置。")
+                    .setPositiveButton("知道了", null)
+                    .show();
+            return;
+        }
+        java.util.Set<String> hidden = ExamCountdownStore.hiddenIds(a);
+        String[] labels = new String[candidates.size()];
+        boolean[] checked = new boolean[candidates.size()];
+        for (int i = 0; i < candidates.size(); i++) {
+            com.ecut.campus.data.ExamCountdown.Event e = candidates.get(i);
+            int days = Math.max(0, com.ecut.campus.data.ExamCountdown.remainingDays(today, e.date));
+            labels[i] = e.name + "（" + (days == 0 ? "今天" : days + "天后") + "）";
+            checked[i] = !hidden.contains(e.id);
+        }
+        AlertDialog dlg = new AlertDialog.Builder(a)
+                .setTitle("显示的考试")
+                .setMultiChoiceItems(labels, checked, (d, which, isChecked) -> checked[which] = isChecked)
+                .setNeutralButton("全选", null)
+                .setNegativeButton("取消", null)
+                .setPositiveButton("确定", (d, w) -> {
+                    java.util.Set<String> nextHidden = new java.util.HashSet<>(hidden);
+                    for (int i = 0; i < candidates.size(); i++) {
+                        String id = candidates.get(i).id;
+                        if (checked[i]) nextHidden.remove(id);
+                        else nextHidden.add(id);
+                    }
+                    ExamCountdownStore.setHiddenIds(a, nextHidden);
+                    ClassWidget.updateAll(a.getApplicationContext());
+                    renderWidgetExamSettings();
+                })
+                .create();
+        dlg.setOnShowListener(x -> dlg.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(btn -> {
+            android.widget.ListView lv = dlg.getListView();
+            for (int i = 0; i < checked.length; i++) {
+                checked[i] = true;
+                if (lv != null) lv.setItemChecked(i, true);
+            }
+        }));
+        dlg.show();
+    }
+
+    private void showExamLeadDialog() {
+        final int[] values = {0, 7, 14, 30, 60, -1};
+        String[] labels = {"不限天数（有考试就显示）", "考前 7 天内", "考前 14 天内", "考前 30 天内", "考前 60 天内", "自定义天数…"};
+        int cur = Prefs.widgetExamLeadDays(a);
+        int checked = 5;
+        for (int i = 0; i < values.length - 1; i++) {
+            if (values[i] == cur) { checked = i; break; }
+        }
+        new AlertDialog.Builder(a)
+                .setTitle("提前几天开始提醒")
+                .setSingleChoiceItems(labels, checked, (dlg, which) -> {
+                    dlg.dismiss();
+                    if (values[which] < 0) {
+                        showCustomLeadDaysDialog();
+                        return;
+                    }
+                    Prefs.setWidgetExamLeadDays(a, values[which]);
+                    ClassWidget.updateAll(a.getApplicationContext());
+                    renderWidgetExamSettings();
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void showCustomLeadDaysDialog() {
+        float d = a.getResources().getDisplayMetrics().density;
+        LinearLayout wrap = new LinearLayout(a);
+        wrap.setOrientation(LinearLayout.VERTICAL);
+        wrap.setPadding(Math.round(20 * d), Math.round(12 * d), Math.round(20 * d), 0);
+        android.widget.EditText input = new android.widget.EditText(a);
+        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        input.setSingleLine(true);
+        input.setHint("输入 1~365 的天数，例如 21");
+        input.setHintTextColor(G.MUTE);
+        input.setTextColor(G.INK);
+        input.setTextSize(15f);
+        input.setBackgroundResource(R.drawable.bg_gauge_input);
+        int pf = Math.round(10 * d);
+        input.setPadding(0, pf, 0, pf);
+        int cur = Prefs.widgetExamLeadDays(a);
+        if (cur > 0) {
+            input.setText(Integer.toString(cur));
+            input.setSelection(input.getText().length());
+        }
+        wrap.addView(input);
+        new AlertDialog.Builder(a)
+                .setTitle("自定义提醒天数")
+                .setView(wrap)
+                .setNegativeButton("取消", null)
+                .setPositiveButton("确定", (dlg, w) -> {
+                    int val;
+                    try {
+                        val = Integer.parseInt(input.getText().toString().trim());
+                    } catch (Exception e) {
+                        Toast.makeText(a, "请输入 1 到 365 之间的整数", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (val < 1 || val > 365) {
+                        Toast.makeText(a, "请输入 1 到 365 之间的整数", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    Prefs.setWidgetExamLeadDays(a, val);
+                    ClassWidget.updateAll(a.getApplicationContext());
+                    renderWidgetExamSettings();
+                })
+                .show();
+    }
+
+    private void showExamIntervalDialog() {
+        final int[] values = {3, 6, 10, 15, 0};
+        String[] labels = {"每 3 秒", "每 6 秒（默认）", "每 10 秒", "每 15 秒", "不自动切换"};
+        int cur = Prefs.widgetExamFlipSeconds(a);
+        int checked = 1;
+        for (int i = 0; i < values.length; i++) {
+            if (values[i] == cur) { checked = i; break; }
+        }
+        new AlertDialog.Builder(a)
+                .setTitle("多场考试切换间隔")
+                .setSingleChoiceItems(labels, checked, (dlg, which) -> {
+                    Prefs.setWidgetExamFlipSeconds(a, values[which]);
+                    ClassWidget.updateAll(a.getApplicationContext());
+                    renderWidgetExamSettings();
+                    dlg.dismiss();
+                })
+                .setNegativeButton("取消", null)
+                .show();
     }
 
     /** 组件背景一栏：分段（默认 / 选一张图片）、遮罩滑杆、按图亮度给的提示。 */
@@ -536,6 +763,7 @@ final class SettingsTab {
         }
         TextView allowSub = settingsFragment.findViewById(R.id.tv_widget_bg_allow_sub);
         if (allowSub != null) allowSub.setText(BgAllow.status(a));
+        renderWidgetExamSettings();
     }
 
     /** 选完图片回来：后台复制缩小，好了刷新小组件和这一栏。 */

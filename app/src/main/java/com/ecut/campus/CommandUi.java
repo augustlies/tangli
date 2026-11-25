@@ -433,37 +433,96 @@ final class CommandUi {
     }
 
     private static void showExamCountdown(Activity a, Timetable.Course c, String semester, Runnable refresh) {
+        float density = a.getResources().getDisplayMetrics().density;
+        int padH = Math.round(20 * density);
+        int padTop = Math.round(12 * density);
+        int gap8 = Math.round(8 * density);
+        int gap16 = Math.round(16 * density);
+        int padField = Math.round(10 * density);
+
         com.ecut.campus.data.ExamCountdown.Event old = ExamCountdownStore.get(a, semester, c.key);
-        android.widget.LinearLayout wrap = new android.widget.LinearLayout(a);
-        wrap.setOrientation(android.widget.LinearLayout.VERTICAL);
-        int pad = Math.round(20 * a.getResources().getDisplayMetrics().density);
-        wrap.setPadding(pad, 0, pad, 0);
-        EditText name = new EditText(a); name.setSingleLine(true); name.setHint("显示名称");
-        name.setText(old == null ? c.name : old.name); wrap.addView(name);
-        android.widget.Button date = new android.widget.Button(a);
+        LinearLayout wrap = new LinearLayout(a);
+        wrap.setOrientation(LinearLayout.VERTICAL);
+        wrap.setPadding(padH, padTop, padH, 0);
+
+        TextView nameLabel = new TextView(a);
+        nameLabel.setText("显示名称");
+        nameLabel.setTextColor(G.SUB);
+        nameLabel.setTextSize(12f);
+        wrap.addView(nameLabel);
+
+        EditText name = new EditText(a);
+        name.setSingleLine(true);
+        name.setHint("例如：大学英语四级");
+        name.setHintTextColor(G.MUTE);
+        name.setTextColor(G.INK);
+        name.setTextSize(15f);
+        name.setBackgroundResource(R.drawable.bg_gauge_input);
+        name.setPadding(0, padField, 0, padField);
+        name.setText(old == null ? c.name : old.name);
+        name.setSelection(name.getText().length());
+        LinearLayout.LayoutParams nameLp = new LinearLayout.LayoutParams(-1, -2);
+        nameLp.topMargin = Math.round(4 * density);
+        wrap.addView(name, nameLp);
+
+        TextView dateLabel = new TextView(a);
+        dateLabel.setText("考试日期");
+        dateLabel.setTextColor(G.SUB);
+        dateLabel.setTextSize(12f);
+        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(-2, -2);
+        dlp.topMargin = gap16;
+        wrap.addView(dateLabel, dlp);
+
+        TextView dateBtn = new TextView(a);
         String[] selected = {old == null ? "" : old.date};
-        date.setText(selected[0].isEmpty() ? "选择考试日期" : selected[0]); wrap.addView(date);
-        date.setOnClickListener(v -> {
+        dateBtn.setBackgroundResource(R.drawable.bg_gauge_outline);
+        dateBtn.setPadding(Math.round(14 * density), Math.round(12 * density),
+                Math.round(14 * density), Math.round(12 * density));
+        dateBtn.setTextSize(14.5f);
+        dateBtn.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL));
+        dateBtn.setText(selected[0].isEmpty() ? "选择日期" : selected[0]);
+        dateBtn.setTextColor(selected[0].isEmpty() ? G.MUTE : G.INK);
+        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(-1, -2);
+        blp.topMargin = gap8;
+        wrap.addView(dateBtn, blp);
+
+        dateBtn.setOnClickListener(v -> {
             java.util.Calendar cal = java.util.Calendar.getInstance();
             if (com.ecut.campus.data.Dates.valid(selected[0])) {
-                String[] p = selected[0].split("-"); cal.set(Integer.parseInt(p[0]), Integer.parseInt(p[1])-1, Integer.parseInt(p[2]));
+                String[] p = selected[0].split("-");
+                cal.set(Integer.parseInt(p[0]), Integer.parseInt(p[1]) - 1, Integer.parseInt(p[2]));
             }
-            new android.app.DatePickerDialog(a, (picker, y, m, d) -> {
-                selected[0] = String.format(java.util.Locale.US, "%04d-%02d-%02d", y, m+1, d);
-                date.setText(selected[0]);
-            }, cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH), cal.get(java.util.Calendar.DAY_OF_MONTH)).show();
+            GaugePickers.date(a, cal.get(java.util.Calendar.YEAR),
+                    cal.get(java.util.Calendar.MONTH),
+                    cal.get(java.util.Calendar.DAY_OF_MONTH),
+                    false,
+                    (y, m, d) -> {
+                        selected[0] = String.format(java.util.Locale.US, "%04d-%02d-%02d", y, m + 1, d);
+                        dateBtn.setText(selected[0]);
+                        dateBtn.setTextColor(G.INK);
+                    });
         });
-        AlertDialog.Builder builder = new AlertDialog.Builder(a).setTitle("考试倒计时").setView(wrap)
-                .setNegativeButton("取消", null).setPositiveButton("保存", (dlg, w) -> {
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(a)
+                .setTitle("考试倒计时")
+                .setView(wrap)
+                .setNegativeButton("取消", null)
+                .setPositiveButton("保存", (dlg, w) -> {
                     if (selected[0].isEmpty() || name.getText().toString().trim().isEmpty()
                             || !ExamCountdownStore.save(a, semester, c.key, name.getText().toString(), selected[0])) {
-                        Toast.makeText(a, "请填写名称和日期", Toast.LENGTH_SHORT).show(); return;
+                        Toast.makeText(a, "请填写名称和日期", Toast.LENGTH_SHORT).show();
+                        return;
                     }
-                    ClassWidget.updateAll(a); if (refresh != null) refresh.run();
+                    ClassWidget.updateAll(a);
+                    if (refresh != null) refresh.run();
                 });
-        if (old != null) builder.setNeutralButton("清除", (dlg, w) -> {
-            ExamCountdownStore.clear(a, semester, c.key); ClassWidget.updateAll(a); if (refresh != null) refresh.run();
-        });
+        if (old != null) {
+            builder.setNeutralButton("清除", (dlg, w) -> {
+                ExamCountdownStore.clear(a, semester, c.key);
+                ClassWidget.updateAll(a);
+                if (refresh != null) refresh.run();
+            });
+        }
         builder.show();
     }
 

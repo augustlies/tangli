@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ViewFlipper xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_exam_flipper"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:animateFirstView="false"
+    android:autoStart="true"
+    android:flipInterval="6000"
+    android:inAnimation="@anim/widget_exam_in"
+    android:measureAllChildren="true"
+    android:outAnimation="@anim/widget_exam_out" />

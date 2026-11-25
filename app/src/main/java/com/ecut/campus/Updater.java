@@ -90,7 +90,11 @@ public final class Updater {
     }
 
     public static boolean isNewer(Release r) {
-        return r != null && VersionCompare.isNewer(r.tag, BuildConfig.VERSION_NAME);
+        return r != null && !isPreviewBuild() && VersionCompare.isNewer(r.tag, BuildConfig.VERSION_NAME);
+    }
+
+    private static boolean isPreviewBuild() {
+        return BuildConfig.VERSION_NAME.toLowerCase(java.util.Locale.ROOT).contains("preview");
     }
 
     /** 打开 App 时静默检查，6 小时最多一次；勾了「不再提示」的版本不再弹。 */
